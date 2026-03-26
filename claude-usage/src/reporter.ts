@@ -1,12 +1,14 @@
 import * as https from "node:https";
 import * as http from "node:http";
 import * as fs from "node:fs";
+import * as path from "node:path";
 import type { Config, HourlyAggregate, HourlyBucket } from "./types.js";
 import {
   readJson,
   writeJsonAtomic,
   getConfigPath,
   getHourlyDir,
+  getStorageDir,
 } from "./utils/storage.js";
 
 interface ReportEntry {
@@ -78,7 +80,7 @@ export async function submitPublicReport(config: Config): Promise<boolean> {
   const serverUrl = config.publicReporting.serverUrl || "https://sfvibe.fun/api/burningman";
 
   // Read last reported hour
-  const statePath = `${getHourlyDir()}/../.report-state.json`;
+  const statePath = path.join(getStorageDir(), ".report-state.json");
   const state = readJson<{ lastReportedHour: string | null }>(statePath, {
     lastReportedHour: null,
   });

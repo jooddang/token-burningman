@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Box, Text, useInput } from "ink";
 import { Table } from "../components/table.js";
 import { BarChart } from "../components/bar-chart.js";
 import { useConfig } from "../hooks/use-config.js";
-import { getProjectStats } from "../../analytics.js";
 import { fmtTokens, fmtCost, fmtPct, fmtLines } from "../../utils/format.js";
-import type { ProjectStat } from "../../types.js";
+import { getProjectsModel } from "../../dashboard/service.js";
+import type { ProjectsViewModel } from "../../dashboard/types.js";
 
 const RANGES = [
   { label: "7d", days: 7 },
@@ -16,7 +16,7 @@ const RANGES = [
 export function ProjectsView() {
   const config = useConfig();
   const [rangeIdx, setRangeIdx] = useState(0);
-  const [projects, setProjects] = useState<ProjectStat[]>([]);
+  const [model, setModel] = useState<ProjectsViewModel | null>(null);
 
   useInput((input) => {
     if (input === "[" && rangeIdx > 0) setRangeIdx(rangeIdx - 1);
@@ -24,48 +24,46 @@ export function ProjectsView() {
   });
 
   useEffect(() => {
-    const load = () => setProjects(getProjectStats(RANGES[rangeIdx].days));
+    const load = () => setModel(getProjectsModel(RANGES[rangeIdx].days));
     load();
     const interval = setInterval(load, config.tui.refreshIntervalSec * 1000);
     return () => clearInterval(interval);
   }, [rangeIdx, config.tui.refreshIntervalSec]);
 
-  const rows = projects.map((p) => ({
-    project: p.project,
-    tokens: fmtTokens(p.totalTokens),
-    cost: fmtCost(p.cost),
-    sessions: String(p.sessionCount),
-    cache: fmtPct(p.cacheHitRate),
-    lines: fmtLines(p.linesAdded, p.linesRemoved),
+  const projects = model?.projects ?? [];
+  const rows = projects.map((project) => ({
+    project: project.project,
+    tokens: fmtTokens(project.totalTokens),
+    cost: fmtCost(project.cost),
+    sessions: String(project.sessionCount),
+    cache: fmtPct(project.cacheHitRate),
+    lines: fmtLines(project.linesAdded, project.linesRemoved),
   }));
 
-  // Bar chart data
-  const barData = projects.slice(0, 8).map((p) => ({
-    label: p.project.slice(0, 18),
-    value: p.cost,
+  const barData = projects.slice(0, 8).map((project) => ({
+    label: project.project.slice(0, 18),
+    value: project.cost,
     color: "yellow" as string,
   }));
 
   return (
     <Box flexDirection="column" paddingX={1}>
-      {/* Header + range selector */}
       <Box marginBottom={1}>
         <Text bold> PROJECTS </Text>
         <Text dimColor>(</Text>
-        {RANGES.map((r, i) => (
-          <React.Fragment key={r.label}>
-            {i > 0 && <Text dimColor> | </Text>}
-            {i === rangeIdx ? (
-              <Text bold color="cyan">[{r.label}]</Text>
+        {RANGES.map((range, index) => (
+          <React.Fragment key={range.label}>
+            {index > 0 && <Text dimColor> | </Text>}
+            {index === rangeIdx ? (
+              <Text bold color="cyan">[{range.label}]</Text>
             ) : (
-              <Text dimColor>{r.label}</Text>
+              <Text dimColor>{range.label}</Text>
             )}
           </React.Fragment>
         ))}
         <Text dimColor>)  sorted by: cost desc  Use [ ] to change</Text>
       </Box>
 
-      {/* Project table */}
       <Box flexDirection="column" marginBottom={1} marginLeft={1}>
         <Table
           columns={[
@@ -81,7 +79,6 @@ export function ProjectsView() {
         />
       </Box>
 
-      {/* Cost bar chart */}
       {barData.length > 0 && (
         <Box flexDirection="column" marginLeft={1} marginBottom={1}>
           <Text bold>COST BY PROJECT</Text>
@@ -91,25 +88,18 @@ export function ProjectsView() {
         </Box>
       )}
 
-      {/* Model mix */}
       {projects.length > 0 && (
         <Box flexDirection="column" marginLeft={1}>
           <Text bold>MODEL MIX BY PROJECT</Text>
-          {projects.slice(0, 5).map((p) => (
-            <Box key={p.project} marginLeft={1}>
-              <Text dimColor>{p.project.padEnd(20)}</Text>
-              {Object.entries(p.modelMix).map(([model, pct]) => (
+          {projects.slice(0, 5).map((project) => (
+            <Box key={project.project} marginLeft={1}>
+              <Text dimColor>{project.project.padEnd(20)}</Text>
+              {Object.entries(project.modelMix).map(([name, pct]) => (
                 <Text
-                  key={model}
-                  color={
-                    model === "Opus"
-                      ? "magenta"
-                      : model === "Sonnet"
-                        ? "cyan"
-                        : "green"
-                  }
+                  key={name}
+                  color={name === "Opus" ? "magenta" : name === "Sonnet" ? "cyan" : "green"}
                 >
-                  {model} {pct}%{"  "}
+                  {name} {pct}%{"  "}
                 </Text>
               ))}
             </Box>

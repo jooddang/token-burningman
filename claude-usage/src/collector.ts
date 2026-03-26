@@ -4,8 +4,8 @@ import type { StatuslineInput, SessionEntry, Config } from "./types.js";
 import { DEFAULT_CONFIG } from "./types.js";
 import { appendJsonl, getSessionFilePath, getConfigPath, ensureStorageDirs } from "./utils/storage.js";
 import type { QuotaState } from "./types.js";
-import { readJson } from "./utils/storage.js";
-import { shouldFetchQuota, triggerQuotaFetchBackground } from "./quota.js";
+import { shouldFetchQuota, triggerQuotaFetchBackground, readQuotaState } from "./quota.js";
+import { shouldRunHourlyMaintenance, triggerHourlyMaintenanceBackground } from "./maintenance.js";
 import {
   fmtCost,
   fmtPct,
@@ -17,6 +17,7 @@ import {
   cacheHitRate,
   colorize,
   bold,
+  normalizeQuotaUtilization,
   YELLOW,
   RED,
   GREEN,
@@ -54,18 +55,6 @@ function extractEntry(parsed: StatuslineInput): SessionEntry {
   };
 }
 
-function readQuotaState(): QuotaState | null {
-  const quotaPath = path.join(
-    process.env.CLAUDE_USAGE_DIR || path.join(process.env.HOME || "", ".token-burningman"),
-    "quota", "state.json",
-  );
-  return readJson<QuotaState | null>(quotaPath, null);
-}
-
-// Normalize utilization: API may return 0-100 (percentage) or 0-1 (fraction)
-function normalizeUtil(val: number): number {
-  return val > 1 ? val : val * 100;
-}
 
 function formatQuota(quota: QuotaState | null, config: Config): string {
   if (!quota || (!quota.five_hour && !quota.seven_day)) return "";
@@ -73,12 +62,12 @@ function formatQuota(quota: QuotaState | null, config: Config): string {
   const parts: string[] = [];
 
   if (quota.five_hour) {
-    const pct = Math.round(normalizeUtil(quota.five_hour.utilization));
+    const pct = Math.round(normalizeQuotaUtilization(quota.five_hour.utilization)!);
     const color = pct > thresholdPct ? RED : pct > 60 ? YELLOW : GREEN;
     parts.push(`5h:${colorize(fmtPct(pct), color)}`);
   }
   if (quota.seven_day) {
-    const pct = Math.round(normalizeUtil(quota.seven_day.utilization));
+    const pct = Math.round(normalizeQuotaUtilization(quota.seven_day.utilization)!);
     const color = pct > thresholdPct ? RED : pct > 60 ? YELLOW : GREEN;
     parts.push(`7d:${colorize(fmtPct(pct), color)}`);
   }
@@ -90,10 +79,10 @@ function formatAlerts(entry: SessionEntry, quota: QuotaState | null, config: Con
   const alerts: string[] = [];
   const thresholdPct = (config.alerts?.quotaWarningThreshold ?? 0.8) * 100;
 
-  if (quota?.five_hour && normalizeUtil(quota.five_hour.utilization) > thresholdPct) {
+  if (quota?.five_hour && normalizeQuotaUtilization(quota.five_hour.utilization)! > thresholdPct) {
     alerts.push(colorize("⚠5h", RED));
   }
-  if (quota?.seven_day && normalizeUtil(quota.seven_day.utilization) > thresholdPct) {
+  if (quota?.seven_day && normalizeQuotaUtilization(quota.seven_day.utilization)! > thresholdPct) {
     alerts.push(colorize("⚠7d", RED));
   }
   if (config.alerts?.costDailyBudget && entry.cost > config.alerts.costDailyBudget) {
@@ -177,6 +166,11 @@ function main(): void {
   // Maybe trigger background quota fetch (non-blocking)
   if (shouldFetchQuota(config)) {
     triggerQuotaFetchBackground(path.dirname(process.argv[1] || __filename));
+  }
+
+  // Opportunistic hourly maintenance driven by active statusline heartbeats.
+  if (shouldRunHourlyMaintenance(config)) {
+    triggerHourlyMaintenanceBackground(path.dirname(process.argv[1] || __filename));
   }
 }
 

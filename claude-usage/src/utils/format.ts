@@ -35,6 +35,15 @@ export function fmtLines(added: number, removed: number): string {
   return `+${added}/-${removed}`;
 }
 
+/**
+ * Normalize utilization: API may return 0-100 (percentage) or 0-1 (fraction).
+ * Returns null for non-numeric input.
+ */
+export function normalizeQuotaUtilization(value: number | null | undefined): number | null {
+  if (typeof value !== "number") return null;
+  return Math.round(value > 1 ? value : value * 100);
+}
+
 const MODEL_NAMES: Record<string, string> = {
   "claude-opus-4-6": "Opus",
   "claude-sonnet-4-6": "Sonnet",

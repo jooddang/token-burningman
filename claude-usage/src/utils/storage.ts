@@ -32,6 +32,14 @@ export function getAggregationMetaPath(): string {
   return path.join(getStorageDir(), ".aggregation-meta.json");
 }
 
+export function getMaintenanceStatePath(): string {
+  return path.join(getStorageDir(), ".maintenance-state.json");
+}
+
+export function getMaintenanceLockPath(): string {
+  return path.join(getStorageDir(), ".maintenance.lock");
+}
+
 export function ensureDir(dirPath: string): void {
   if (!fs.existsSync(dirPath)) {
     fs.mkdirSync(dirPath, { recursive: true, mode: 0o700 });
@@ -103,4 +111,40 @@ export function listSessionFiles(): string[] {
 
 export function sessionIdFromPath(filePath: string): string {
   return path.basename(filePath, ".jsonl");
+}
+
+const DEFAULT_LOCK_STALE_MS = 15 * 60_000;
+
+export function acquireLock(lockPath: string, staleMs = DEFAULT_LOCK_STALE_MS): number | null {
+  ensureDir(path.dirname(lockPath));
+
+  try {
+    return fs.openSync(lockPath, "wx", 0o600);
+  } catch {
+    try {
+      const stat = fs.statSync(lockPath);
+      if (Date.now() - stat.mtimeMs > staleMs) {
+        fs.unlinkSync(lockPath);
+        return fs.openSync(lockPath, "wx", 0o600);
+      }
+    } catch {
+      // Another process may have removed the lock or it may be unreadable.
+    }
+    return null;
+  }
+}
+
+export function releaseLock(lockPath: string, fd: number | null): void {
+  if (fd !== null) {
+    try {
+      fs.closeSync(fd);
+    } catch {
+      // Ignore close failures.
+    }
+  }
+  try {
+    fs.unlinkSync(lockPath);
+  } catch {
+    // Ignore unlock failures.
+  }
 }

@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "token-burningman": {
+      "command": "node",
+      "args": ["${PWD}/bin/mcp.cjs"]
+    }
+  }
+}

@@ -1,69 +1,61 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Box, Text } from "ink";
 import { KpiCard } from "../components/kpi-card.js";
 import { StackedBarChart } from "../components/bar-chart.js";
 import { Table } from "../components/table.js";
 import { ProgressBar } from "../components/progress-bar.js";
-import { useSessionData } from "../hooks/use-session-data.js";
 import { useConfig } from "../hooks/use-config.js";
 import { fmtTokens, fmtCost, fmtPct, fmtDuration, fmtLines } from "../../utils/format.js";
-import { cacheHitRate } from "../../utils/format.js";
-import { readJson } from "../../utils/storage.js";
-import type { QuotaState } from "../../types.js";
+import { getOverviewModel } from "../../dashboard/service.js";
+import type { OverviewViewModel } from "../../dashboard/types.js";
 
-function QuotaDisplay() {
-  const [quota, setQuota] = useState<QuotaState | null>(null);
+function QuotaDisplay({ quota }: { quota: OverviewViewModel["quota"] }) {
+  if (!quota || (quota.fiveHourPct === null && quota.sevenDayPct === null)) {
+    return null;
+  }
 
-  useEffect(() => {
-    const load = () => {
-      const home = process.env.HOME || "";
-      const quotaPath = `${process.env.CLAUDE_USAGE_DIR || `${home}/.token-burningman`}/quota/state.json`;
-      setQuota(readJson<QuotaState | null>(quotaPath, null));
-    };
-    load();
-    const interval = setInterval(load, 10000);
-    return () => clearInterval(interval);
-  }, []);
-
-  if (!quota || (!quota.five_hour && !quota.seven_day)) return null;
-
-  // Normalize: API may return 0-100 (percentage) or 0-1 (fraction)
-  const normUtil = (val: number) => (val > 1 ? val : val * 100);
-
-  const fmtReset = (iso: string) => {
+  const fmtReset = (iso: string | null) => {
+    if (!iso) return "unknown";
     try {
       const d = new Date(iso);
-      return d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-    } catch { return iso; }
+      return d.toLocaleString(undefined, {
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      });
+    } catch {
+      return iso;
+    }
   };
 
   return (
     <Box flexDirection="column" marginBottom={1}>
       <Text bold> QUOTA</Text>
       <Box marginLeft={1} flexDirection="column">
-        {quota.five_hour && (
-          <ProgressBar
-            value={normUtil(quota.five_hour.utilization)}
-            max={100}
-            width={20}
-            label={`5-hour: `}
-            thresholds={{ warn: 60, danger: 80 }}
-          />
+        {quota.fiveHourPct !== null && (
+          <>
+            <ProgressBar
+              value={quota.fiveHourPct}
+              max={100}
+              width={20}
+              label="5-hour: "
+              thresholds={{ warn: 60, danger: 80 }}
+            />
+            <Text dimColor>         resets {fmtReset(quota.fiveHourResetsAt)}</Text>
+          </>
         )}
-        {quota.five_hour && (
-          <Text dimColor>         resets {fmtReset(quota.five_hour.resets_at)}</Text>
-        )}
-        {quota.seven_day && (
-          <ProgressBar
-            value={normUtil(quota.seven_day.utilization)}
-            max={100}
-            width={20}
-            label={`7-day:  `}
-            thresholds={{ warn: 60, danger: 80 }}
-          />
-        )}
-        {quota.seven_day && (
-          <Text dimColor>         resets {fmtReset(quota.seven_day.resets_at)}</Text>
+        {quota.sevenDayPct !== null && (
+          <>
+            <ProgressBar
+              value={quota.sevenDayPct}
+              max={100}
+              width={20}
+              label="7-day:  "
+              thresholds={{ warn: 60, danger: 80 }}
+            />
+            <Text dimColor>         resets {fmtReset(quota.sevenDayResetsAt)}</Text>
+          </>
         )}
       </Box>
     </Box>
@@ -85,95 +77,54 @@ function getModelShortName(modelId: string): string {
 
 export function OverviewView() {
   const config = useConfig();
-  const { sessions, todayHourly, isLoading } = useSessionData(
-    config.tui.refreshIntervalSec,
-  );
+  const [model, setModel] = useState<OverviewViewModel | null>(null);
 
-  if (isLoading) {
+  useEffect(() => {
+    const load = () => setModel(getOverviewModel());
+    load();
+    const interval = setInterval(load, config.tui.refreshIntervalSec * 1000);
+    return () => clearInterval(interval);
+  }, [config.tui.refreshIntervalSec]);
+
+  if (!model) {
     return <Text>Loading...</Text>;
   }
 
-  // Compute today's KPIs from sessions that started today
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  const todayMs = todayStart.getTime();
+  const hourlyBars = model.hourly.map((row) => ({
+    label: row.hour,
+    segments: row.models.map((segment) => ({
+      value: segment.tokens,
+      color: MODEL_COLORS[getModelShortName(segment.model)] || "cyan",
+    })),
+  }));
 
-  const todaySessions = sessions.filter(
-    (s) => s.startTime >= todayMs || s.endTime >= todayMs,
-  );
-  const activeSessions = sessions.filter((s) => s.isActive);
-
-  let totalTokens = 0;
-  let totalCost = 0;
-  let totalCacheRead = 0;
-  let totalInput = 0;
-  let totalLinesAdded = 0;
-  let totalLinesRemoved = 0;
-
-  for (const s of todaySessions) {
-    totalTokens += s.totalInput + s.totalOutput;
-    totalCost += s.cost;
-    totalCacheRead += s.cacheRead;
-    totalInput += s.inputTokens;
-    totalLinesAdded += s.linesAdded;
-    totalLinesRemoved += s.linesRemoved;
-  }
-
-  const cacheRate = cacheHitRate(totalCacheRead, totalInput);
-
-  // Build hourly chart data
-  const hours = Array.from({ length: 24 }, (_, i) => String(i));
-  const hourlyBars = [];
-  for (const h of hours) {
-    const hourNum = parseInt(h);
-    if (hourNum > new Date().getHours()) break;
-    const bucket = todayHourly[h];
-    if (!bucket) continue;
-
-    const segments: { value: number; color: string }[] = [];
-    for (const [model, data] of Object.entries(bucket)) {
-      const shortName = getModelShortName(model);
-      segments.push({
-        value: data.input + data.output,
-        color: MODEL_COLORS[shortName] || "cyan",
-      });
-    }
-    if (segments.some((s) => s.value > 0)) {
-      hourlyBars.push({ label: h.padStart(2), segments });
-    }
-  }
-
-  // Active sessions table
-  const activeRows = activeSessions.map((s) => ({
-    model: getModelShortName(s.model).charAt(0).toUpperCase() +
-      getModelShortName(s.model).slice(1),
-    project: s.proj,
-    ctx: fmtPct(s.peakCtx),
-    cost: fmtCost(s.cost),
-    dur: fmtDuration(Date.now() - s.startTime),
-    lines: fmtLines(s.linesAdded, s.linesRemoved),
+  const activeRows = model.activeSessions.map((session) => ({
+    model: session.modelLabel,
+    project: session.proj,
+    ctx: fmtPct(session.peakCtx),
+    cost: fmtCost(session.cost),
+    dur: fmtDuration(Date.now() - session.startTime),
+    lines: fmtLines(session.linesAdded, session.linesRemoved),
   }));
 
   return (
     <Box flexDirection="column" paddingX={1}>
-      {/* KPI Row */}
       <Box marginBottom={1}>
-        <KpiCard label="TODAY TOKENS" value={fmtTokens(totalTokens)} color="white" />
-        <KpiCard label="24H COST" value={fmtCost(totalCost)} color="yellow" />
+        <KpiCard label="TODAY TOKENS" value={fmtTokens(model.totals.totalTokens)} color="white" />
+        <KpiCard label="24H COST" value={fmtCost(model.totals.totalCost)} color="yellow" />
         <KpiCard
           label="SESSIONS"
-          value={`${todaySessions.length}`}
-          sub={`${activeSessions.length} active`}
+          value={`${model.totals.sessionCount}`}
+          sub={`${model.totals.activeSessionCount} active`}
         />
-        <KpiCard label="CACHE HIT" value={fmtPct(cacheRate)} color="green" />
+        <KpiCard label="CACHE HIT" value={fmtPct(model.totals.cacheHitRate)} color="green" />
         <KpiCard
           label="LINES"
-          value={fmtLines(totalLinesAdded, totalLinesRemoved)}
+          value={fmtLines(model.totals.linesAdded, model.totals.linesRemoved)}
           color="white"
         />
       </Box>
 
-      {/* Hourly Chart */}
       <Box flexDirection="column" marginBottom={1}>
         <Text bold> HOURLY TOKEN USAGE (today)</Text>
         {hourlyBars.length > 0 ? (
@@ -183,17 +134,15 @@ export function OverviewView() {
         ) : (
           <Text dimColor>  No hourly data yet. Data appears after aggregation.</Text>
         )}
-        <Box marginLeft={1} marginTop={0}>
+        <Box marginLeft={1}>
           <Text color="magenta">██ Opus  </Text>
           <Text color="cyan">██ Sonnet  </Text>
           <Text color="green">██ Haiku</Text>
         </Box>
       </Box>
 
-      {/* Quota */}
-      <QuotaDisplay />
+      <QuotaDisplay quota={model.quota} />
 
-      {/* Active Sessions */}
       <Box flexDirection="column">
         <Text bold> ACTIVE SESSIONS</Text>
         <Box marginLeft={1}>

@@ -10,6 +10,12 @@
   "commands": "./commands/",
   "skills": "./skills/",
   "hooks": "./hooks/hooks.json",
+  "mcpServers": {
+    "token-burningman": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/bin/mcp.cjs"]
+    }
+  },
   "postInstall": "npm install && npm run build",
   "setup": "node bin/collector.cjs"
 }

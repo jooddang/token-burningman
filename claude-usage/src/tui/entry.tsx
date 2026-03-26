@@ -30,4 +30,14 @@ if (args.includes("--version") || args.includes("-v")) {
 }
 
 ensureStorageDirs();
-render(<App />);
+
+// Enter alternate screen buffer to avoid ghost frames
+process.stdout.write("\x1b[?1049h");
+process.stdout.write("\x1b[H"); // cursor to top-left
+
+const instance = render(<App />);
+
+instance.waitUntilExit().then(() => {
+  // Leave alternate screen buffer
+  process.stdout.write("\x1b[?1049l");
+});

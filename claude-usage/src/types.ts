@@ -150,6 +150,7 @@ export interface Config {
   collection: {
     enabled: boolean;
     quotaPollingIntervalMin: number;
+    hourlyMaintenanceIntervalMin: number;
     sessionRetentionDays: number;
     archiveAfterDays: number;
   };
@@ -181,6 +182,7 @@ export const DEFAULT_CONFIG: Config = {
   collection: {
     enabled: true,
     quotaPollingIntervalMin: 60,
+    hourlyMaintenanceIntervalMin: 60,
     sessionRetentionDays: 90,
     archiveAfterDays: 30,
   },

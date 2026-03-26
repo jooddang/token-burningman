@@ -3,7 +3,7 @@ import * as path from "node:path";
 import * as https from "node:https";
 import { execSync } from "node:child_process";
 import type { QuotaState, Config } from "./types.js";
-import { readJson, writeJsonAtomic, appendJsonl, getStorageDir } from "./utils/storage.js";
+import { readJson, writeJsonAtomic, appendJsonl, getStorageDir, acquireLock, releaseLock } from "./utils/storage.js";
 
 const QUOTA_STATE_PATH = () => path.join(getStorageDir(), "quota", "state.json");
 const QUOTA_HISTORY_PATH = () => path.join(getStorageDir(), "quota", "history.jsonl");
@@ -121,39 +121,25 @@ export function fetchQuota(token: string): Promise<QuotaState | null> {
  */
 export async function fetchQuotaSafe(config: Config): Promise<QuotaState | null> {
   const lockPath = QUOTA_LOCK_PATH();
-  const dir = path.dirname(lockPath);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-
-  let fd: number;
-  try {
-    fd = fs.openSync(lockPath, "w");
-  } catch {
+  const fd = acquireLock(lockPath);
+  if (fd === null) {
     return null;
   }
 
-  // Try non-blocking exclusive lock
   try {
-    // Node.js doesn't have LOCK_NB natively, so use a simple timestamp-based approach
     const state = readQuotaState();
     const intervalMs = (config.collection?.quotaPollingIntervalMin ?? 60) * 60_000;
     if (Date.now() - state.lastFetchedAt < intervalMs) {
-      fs.closeSync(fd);
       return state; // Another session just fetched
     }
-  } catch {
-    // Continue with fetch attempt
-  }
 
-  try {
     const token = getOAuthToken();
     if (!token) {
-      fs.closeSync(fd);
       return null;
     }
 
     const quota = await fetchQuota(token);
     if (!quota) {
-      fs.closeSync(fd);
       return null;
     }
 
@@ -164,11 +150,9 @@ export async function fetchQuotaSafe(config: Config): Promise<QuotaState | null>
       seven_day: quota.seven_day?.utilization ?? null,
     });
 
-    fs.closeSync(fd);
     return quota;
-  } catch {
-    try { fs.closeSync(fd); } catch {}
-    return null;
+  } finally {
+    releaseLock(lockPath, fd);
   }
 }
 
@@ -185,7 +169,6 @@ export function triggerQuotaFetchBackground(binDir: string): void {
     const child = spawn("node", [script], {
       detached: true,
       stdio: "ignore",
-      env: { ...process.env },
     });
     child.unref();
   } catch {
