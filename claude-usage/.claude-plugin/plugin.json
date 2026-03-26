@@ -1,0 +1,15 @@
+{
+  "name": "token-burningman",
+  "version": "0.1.0",
+  "description": "Token usage analytics for Claude Code. Local-first. Privacy-safe.",
+  "author": {
+    "name": "sfvibe.fun"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/sfvibe/token-burningman",
+  "commands": "./commands/",
+  "skills": "./skills/",
+  "hooks": "./hooks/hooks.json",
+  "postInstall": "npm install && npm run build",
+  "setup": "node bin/collector.cjs"
+}

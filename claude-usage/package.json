@@ -1,0 +1,27 @@
+{
+  "name": "token-burningman",
+  "version": "0.1.0",
+  "description": "Token usage analytics for Claude Code. Local-first. Privacy-safe.",
+  "type": "module",
+  "bin": {
+    "token-burningman": "./bin/tui.js"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "ink": "^5.1.0",
+    "react": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^18.3.0",
+    "tsup": "^8.4.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  },
+  "author": "sfvibe.fun",
+  "license": "MIT"
+}

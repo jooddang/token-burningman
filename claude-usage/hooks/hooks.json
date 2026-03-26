@@ -1,0 +1,17 @@
+{
+  "description": "token-burningman hooks for session aggregation",
+  "hooks": {
+    "SessionEnd": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PLUGIN_ROOT\"/bin/aggregate.cjs",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}
