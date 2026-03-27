@@ -30,6 +30,14 @@ export function getHudWrapperPath(): string {
 }
 
 export function getPluginRootFromScript(scriptPath: string): string {
+  if (process.env.CLAUDE_PLUGIN_ROOT) {
+    return process.env.CLAUDE_PLUGIN_ROOT;
+  }
+
+  if (typeof __dirname !== "undefined") {
+    return path.resolve(__dirname, "..");
+  }
+
   return path.dirname(path.dirname(path.resolve(scriptPath)));
 }
 

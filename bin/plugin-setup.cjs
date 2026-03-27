@@ -145,6 +145,12 @@ function getHudWrapperPath() {
   return path2.join(getStorageDir(), "bin", "statusline.mjs");
 }
 function getPluginRootFromScript(scriptPath) {
+  if (process.env.CLAUDE_PLUGIN_ROOT) {
+    return process.env.CLAUDE_PLUGIN_ROOT;
+  }
+  if (typeof __dirname !== "undefined") {
+    return path2.resolve(__dirname, "..");
+  }
   return path2.dirname(path2.dirname(path2.resolve(scriptPath)));
 }
 function escapeForJs(value) {

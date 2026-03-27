@@ -2,7 +2,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { getHudWrapperPath, installHudStatusLine } from "../src/plugin-setup.js";
+import { getHudWrapperPath, getPluginRootFromScript, installHudStatusLine } from "../src/plugin-setup.js";
 
 describe("plugin setup HUD installation", () => {
   let tempHome: string;
@@ -84,5 +84,11 @@ describe("plugin setup HUD installation", () => {
 
     expect(result.status).toBe("skipped-existing");
     expect(settings.statusLine.command).toBe("node /tmp/other-statusline.js");
+  });
+
+  it("prefers the explicit CLAUDE_PLUGIN_ROOT override", () => {
+    process.env.CLAUDE_PLUGIN_ROOT = "/tmp/token-burningman";
+    expect(getPluginRootFromScript("/ignored/bin/plugin-setup.cjs")).toBe("/tmp/token-burningman");
+    delete process.env.CLAUDE_PLUGIN_ROOT;
   });
 });
