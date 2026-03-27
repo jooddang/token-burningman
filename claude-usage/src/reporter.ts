@@ -107,6 +107,7 @@ export async function submitPublicReport(config: Config): Promise<boolean> {
           "Content-Length": Buffer.byteLength(body),
           "Authorization": `Bearer ${cliToken}`,
         },
+        rejectUnauthorized: true,
         timeout: 10000,
       },
       (res) => {

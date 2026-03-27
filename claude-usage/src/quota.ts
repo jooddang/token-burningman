@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as https from "node:https";
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import type { QuotaState, Config } from "./types.js";
 import { readJson, writeJsonAtomic, appendJsonl, getStorageDir, acquireLock, releaseLock } from "./utils/storage.js";
 
@@ -32,9 +32,10 @@ export function getOAuthToken(): string | null {
   // Try macOS Keychain first
   if (process.platform === "darwin") {
     try {
-      const raw = execSync(
-        'security find-generic-password -s "Claude Code-credentials" -w 2>/dev/null',
-        { encoding: "utf8", timeout: 3000 },
+      const raw = execFileSync(
+        "security",
+        ["find-generic-password", "-s", "Claude Code-credentials", "-w"],
+        { encoding: "utf8", timeout: 3000, stdio: ["pipe", "pipe", "ignore"] },
       ).trim();
       const parsed = JSON.parse(raw);
       // Handle nested structures: {claudeAiOauth: {accessToken: "..."}}
@@ -80,6 +81,7 @@ export function fetchQuota(token: string): Promise<QuotaState | null> {
           Authorization: `Bearer ${token}`,
           "anthropic-beta": "oauth-2025-04-20",
         },
+        rejectUnauthorized: true,
         timeout: 5000,
       },
       (res) => {

@@ -30,9 +30,10 @@ export async function launchTui(mode: "auto" | "tmux" | "terminal" = "auto"): Pr
 
   if ((mode === "auto" || mode === "terminal") && process.platform === "darwin") {
     try {
+      const safePath = tuiPath.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
       execFileSync("osascript", [
         "-e",
-        `tell application "Terminal" to do script "exec node " & quoted form of "${tuiPath}"`,
+        `tell application "Terminal" to do script "exec node " & quoted form of "${safePath}"`,
       ], {
         cwd: process.cwd(),
         stdio: "ignore",

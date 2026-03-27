@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "description": "Token usage analytics for Claude Code. Local-first. Privacy-safe.",
   "author": {
-    "name": "sfvibe.fun"
+    "name": "jooddang",
+    "email": "gm@sfvibe.fun"
   },
   "license": "MIT",
   "homepage": "https://github.com/sfvibe/token-burningman",

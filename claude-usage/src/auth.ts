@@ -25,6 +25,7 @@ function makeRequest(
         "Content-Type": "application/json",
         ...(body ? { "Content-Length": Buffer.byteLength(body) } : {}),
       },
+      ...(isHttps ? { rejectUnauthorized: true } : {}),
       timeout: 10000,
     };
 

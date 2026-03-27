@@ -1,7 +1,7 @@
 # claude-usage: Product Requirements Document
 
 **Version**: 0.1.0-draft
-**Author**: Eun (CTO)
+**Author**: jooddang
 **Date**: 2026-03-22
 **Status**: Draft for Review
 

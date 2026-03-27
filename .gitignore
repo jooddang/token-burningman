@@ -2,6 +2,12 @@
 .omc
 .DS_Store
 .env*
+*.pem
+*.key
+*.p12
+*.pfx
+*.secret
+.credentials*
 
 node_modules
 */bin
