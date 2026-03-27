@@ -1,6 +1,6 @@
 {
   "name": "token-burningman",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Token usage analytics for Claude Code with TUI, statusline, MCP, and opt-in community reporting. Local-first. Privacy-safe.",
   "type": "module",
   "bin": {
