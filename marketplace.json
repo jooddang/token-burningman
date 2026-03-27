@@ -1,0 +1,19 @@
+{
+  "name": "jooddang",
+  "description": "Plugins by jooddang",
+  "plugins": [
+    {
+      "name": "token-burningman",
+      "version": "0.1.0",
+      "description": "Token usage analytics for Claude Code. Local-first. Privacy-safe.",
+      "path": "./claude-usage",
+      "author": {
+        "name": "jooddang",
+        "email": "gm@sfvibe.fun"
+      },
+      "license": "MIT",
+      "homepage": "https://github.com/jooddang/token-burningman",
+      "keywords": ["token", "usage", "analytics", "tui", "dashboard", "cost"]
+    }
+  ]
+}

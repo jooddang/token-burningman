@@ -28,10 +28,14 @@ npm install -g token-burningman
 burningman
 ```
 
-### Claude Code plugin
+### Claude Code plugin (recommended)
 
 ```bash
-claude plugin add /path/to/token-burningman/claude-usage
+# Add the marketplace
+claude plugin marketplace add jooddang/token-burningman
+
+# Install the plugin
+claude plugin install token-burningman@jooddang
 ```
 
 This registers the MCP server, statusline hooks, and slash commands automatically.
@@ -43,25 +47,9 @@ git clone https://github.com/jooddang/token-burningman.git
 cd token-burningman/claude-usage
 npm install
 npm run build
-```
 
-Then install as a plugin:
-
-```bash
-claude plugin add /path/to/token-burningman/claude-usage
-```
-
-Or configure the MCP server manually in your Claude Code settings:
-
-```json
-{
-  "mcpServers": {
-    "token-burningman": {
-      "command": "node",
-      "args": ["/path/to/token-burningman/claude-usage/bin/mcp.cjs"]
-    }
-  }
-}
+# Install as a local plugin
+claude plugin add ./claude-usage
 ```
 
 ## Usage
@@ -220,7 +208,7 @@ claude-usage/
 npm uninstall -g token-burningman
 
 # Remove Claude Code plugin
-claude plugin remove token-burningman
+claude plugin uninstall token-burningman@jooddang
 
 # Remove local data (optional)
 rm -rf ~/.token-burningman
