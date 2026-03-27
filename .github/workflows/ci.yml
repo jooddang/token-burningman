@@ -27,15 +27,12 @@ jobs:
           version: 9
 
       - name: Install dependencies
-        working-directory: claude-usage
         run: pnpm install --frozen-lockfile
 
       - name: Build
-        working-directory: claude-usage
         run: pnpm run build
 
       - name: Test
-        working-directory: claude-usage
         run: pnpm run test
 
   audit:
@@ -54,9 +51,7 @@ jobs:
           version: 9
 
       - name: Install dependencies
-        working-directory: claude-usage
         run: pnpm install --frozen-lockfile
 
       - name: Security audit
-        working-directory: claude-usage
         run: pnpm audit --prod
