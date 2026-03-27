@@ -1,11 +1,13 @@
 #!/usr/bin/env node
+import { createRequire } from "node:module";
+const require = createRequire(import.meta.url);
 import {
   authenticateCli,
   isAuthenticated
-} from "./chunk-NNTSHCFT.js";
+} from "./chunk-OF2HD2D5.js";
 import {
   DEFAULT_CONFIG
-} from "./chunk-YCAD3QRK.js";
+} from "./chunk-MBDCKNJI.js";
 import {
   ensureStorageDirs,
   getConfigPath,
@@ -16,13 +18,13 @@ import {
   readJson,
   readJsonl,
   sessionIdFromPath
-} from "./chunk-6RWSJQBF.js";
+} from "./chunk-P2X3U3Y3.js";
 import {
   __commonJS,
   __export,
   __require,
   __toESM
-} from "./chunk-77HVPD4G.js";
+} from "./chunk-DXOULAZU.js";
 
 // node_modules/.pnpm/react@18.3.1/node_modules/react/cjs/react.production.min.js
 var require_react_production_min = __commonJS({
@@ -27457,7 +27459,7 @@ var styles_default = styles2;
 // node_modules/.pnpm/ink@5.2.1_@types+react@18.3.28_react-devtools-core@4.28.5_react@18.3.1/node_modules/ink/build/reconciler.js
 if (process3.env["DEV"] === "true") {
   try {
-    await import("./devtools-DLGWCHLC.js");
+    await import("./devtools-F7KKFLFI.js");
   } catch (error) {
     if (error.code === "ERR_MODULE_NOT_FOUND") {
       console.warn(`
@@ -31199,7 +31201,7 @@ function CommunityView() {
         if (input === "s" && (authState === "unauthenticated" || authState === "error")) {
           setAuthState("authenticating");
           setAuthMessage("Opening browser...");
-          import("./setup-CAHHIRUU.js").then(({ ensureConfig }) => {
+          import("./setup-5IHRVMWL.js").then(({ ensureConfig }) => {
             const freshConfig = ensureConfig();
             return authenticateCli(freshConfig);
           }).then((ok) => {
@@ -31220,8 +31222,8 @@ function CommunityView() {
           setAuthMessage("Cancelled. Press [s] to try again.");
         }
         if (input === "o" && authState === "authenticated") {
-          import("./storage-WP7ZPUHH.js").then(({ getConfigPath: getConfigPath2, readJson: readJson2, writeJsonAtomic: writeJsonAtomic2 }) => {
-            import("./types-PLJHGO5L.js").then(({ DEFAULT_CONFIG: DEFAULT_CONFIG2 }) => {
+          import("./storage-KCM6WV3Y.js").then(({ getConfigPath: getConfigPath2, readJson: readJson2, writeJsonAtomic: writeJsonAtomic2 }) => {
+            import("./types-YDPPSSNT.js").then(({ DEFAULT_CONFIG: DEFAULT_CONFIG2 }) => {
               const cfg = readJson2(getConfigPath2(), DEFAULT_CONFIG2);
               cfg.publicReporting.cliToken = null;
               cfg.publicReporting.enabled = false;
@@ -31381,6 +31383,9 @@ function CommunityView() {
   ] });
 }
 
+// src/version.ts
+var APP_VERSION = "0.1.7";
+
 // src/tui/app.tsx
 var import_jsx_runtime12 = __toESM(require_jsx_runtime(), 1);
 var VIEWS = [
@@ -31424,7 +31429,10 @@ function App2() {
         paddingX: 1,
         justifyContent: "space-between",
         children: [
-          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(Text, { bold: true, color: "cyan", children: "token-burningman v0.1.0" }),
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(Text, { bold: true, color: "cyan", children: [
+            "token-burningman v",
+            APP_VERSION
+          ] }),
           /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(Text, { dimColor: true, children: [
             (/* @__PURE__ */ new Date()).toLocaleDateString(),
             " ",
@@ -31462,7 +31470,7 @@ function App2() {
 var import_jsx_runtime13 = __toESM(require_jsx_runtime(), 1);
 var args = process.argv.slice(2);
 if (args.includes("--help") || args.includes("-h")) {
-  console.log(`burningman \u2014 Token usage analytics for Claude Code (v0.1.0)
+  console.log(`burningman \u2014 Token usage analytics for Claude Code (v${APP_VERSION})
 
 Usage:
   burningman [options]
@@ -31480,7 +31488,7 @@ Navigation:
   process.exit(0);
 }
 if (args.includes("--version") || args.includes("-v")) {
-  console.log("burningman v0.1.0");
+  console.log(`burningman v${APP_VERSION}`);
   process.exit(0);
 }
 ensureStorageDirs();

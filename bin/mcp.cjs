@@ -23968,7 +23968,7 @@ function findBinDir() {
 }
 async function launchTui(mode = "auto") {
   const binDir = findBinDir();
-  const tuiPath = path4.join(binDir, "tui.js");
+  const tuiPath = fs4.existsSync(path4.join(binDir, "tui.cjs")) ? path4.join(binDir, "tui.cjs") : path4.join(binDir, "tui.js");
   if (!fs4.existsSync(tuiPath)) {
     return `TUI entry not found at ${tuiPath}`;
   }
@@ -24246,12 +24246,15 @@ function registerTools(server) {
   );
 }
 
+// src/version.ts
+var APP_VERSION = "0.1.7";
+
 // src/mcp/server.ts
 async function main() {
   ensureStorageDirs();
   const server = new McpServer({
     name: "token-burningman",
-    version: "0.1.0"
+    version: APP_VERSION
   });
   registerTools(server);
   registerResources(server);

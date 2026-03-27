@@ -2,11 +2,12 @@ import React from "react";
 import { render } from "ink";
 import { App } from "./app.js";
 import { ensureStorageDirs } from "../utils/storage.js";
+import { APP_VERSION } from "../version.js";
 
 const args = process.argv.slice(2);
 
 if (args.includes("--help") || args.includes("-h")) {
-  console.log(`burningman — Token usage analytics for Claude Code (v0.1.0)
+  console.log(`burningman — Token usage analytics for Claude Code (v${APP_VERSION})
 
 Usage:
   burningman [options]
@@ -25,7 +26,7 @@ Navigation:
 }
 
 if (args.includes("--version") || args.includes("-v")) {
-  console.log("burningman v0.1.0");
+  console.log(`burningman v${APP_VERSION}`);
   process.exit(0);
 }
 

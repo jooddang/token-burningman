@@ -8,7 +8,9 @@ function findBinDir(): string {
 
 export async function launchTui(mode: "auto" | "tmux" | "terminal" = "auto"): Promise<string> {
   const binDir = findBinDir();
-  const tuiPath = path.join(binDir, "tui.js");
+  const tuiPath = fs.existsSync(path.join(binDir, "tui.cjs"))
+    ? path.join(binDir, "tui.cjs")
+    : path.join(binDir, "tui.js");
 
   if (!fs.existsSync(tuiPath)) {
     return `TUI entry not found at ${tuiPath}`;

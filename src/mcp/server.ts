@@ -4,13 +4,14 @@ import { ensureStorageDirs } from "../utils/storage.js";
 import { registerPrompts } from "./prompts.js";
 import { registerResources } from "./resources.js";
 import { registerTools } from "./tools.js";
+import { APP_VERSION } from "../version.js";
 
 async function main(): Promise<void> {
   ensureStorageDirs();
 
   const server = new McpServer({
     name: "token-burningman",
-    version: "0.1.0",
+    version: APP_VERSION,
   });
 
   registerTools(server);

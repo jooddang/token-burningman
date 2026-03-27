@@ -1,9 +1,11 @@
 #!/usr/bin/env node
+import { createRequire } from "node:module";
+const require = createRequire(import.meta.url);
 import {
   __commonJS,
   __require,
   __toESM
-} from "./chunk-77HVPD4G.js";
+} from "./chunk-DXOULAZU.js";
 
 // node_modules/.pnpm/ws@8.20.0/node_modules/ws/lib/constants.js
 var require_constants = __commonJS({

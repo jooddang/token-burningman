@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { createRequire } from "node:module";
+const require = createRequire(import.meta.url);
 
 // src/utils/storage.ts
 import * as fs from "fs";

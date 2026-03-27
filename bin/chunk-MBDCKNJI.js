@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { createRequire } from "node:module";
+const require = createRequire(import.meta.url);
 
 // src/types.ts
 var DEFAULT_CONFIG = {

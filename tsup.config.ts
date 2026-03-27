@@ -1,4 +1,9 @@
 import { defineConfig } from "tsup";
+import { readFileSync } from "node:fs";
+
+const APP_VERSION = JSON.stringify(
+  JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8")).version,
+);
 
 export default defineConfig([
   {
@@ -10,6 +15,9 @@ export default defineConfig([
     bundle: true,
     minify: false,
     sourcemap: false,
+    define: {
+      __APP_VERSION__: APP_VERSION,
+    },
     noExternal: [/.*/],
     banner: { js: "#!/usr/bin/env node" },
     clean: false,
@@ -23,6 +31,9 @@ export default defineConfig([
     bundle: true,
     minify: false,
     sourcemap: false,
+    define: {
+      __APP_VERSION__: APP_VERSION,
+    },
     noExternal: [/.*/],
     banner: { js: "#!/usr/bin/env node" },
     clean: false,
@@ -36,6 +47,9 @@ export default defineConfig([
     bundle: true,
     minify: false,
     sourcemap: false,
+    define: {
+      __APP_VERSION__: APP_VERSION,
+    },
     noExternal: [/.*/],
     banner: { js: "#!/usr/bin/env node" },
     clean: false,
@@ -49,6 +63,9 @@ export default defineConfig([
     bundle: true,
     minify: false,
     sourcemap: false,
+    define: {
+      __APP_VERSION__: APP_VERSION,
+    },
     noExternal: [/.*/],
     banner: { js: "#!/usr/bin/env node" },
     clean: false,
@@ -62,6 +79,9 @@ export default defineConfig([
     bundle: true,
     minify: false,
     sourcemap: false,
+    define: {
+      __APP_VERSION__: APP_VERSION,
+    },
     noExternal: [/.*/],
     banner: { js: "#!/usr/bin/env node" },
     clean: false,
@@ -75,8 +95,13 @@ export default defineConfig([
     bundle: true,
     minify: false,
     sourcemap: false,
+    define: {
+      __APP_VERSION__: APP_VERSION,
+    },
     noExternal: [/.*/],
-    banner: { js: "#!/usr/bin/env node" },
+    banner: {
+      js: '#!/usr/bin/env node\nimport { createRequire } from "node:module";\nconst require = createRequire(import.meta.url);',
+    },
     clean: false,
   },
   {
@@ -88,6 +113,9 @@ export default defineConfig([
     bundle: true,
     minify: false,
     sourcemap: false,
+    define: {
+      __APP_VERSION__: APP_VERSION,
+    },
     noExternal: [/.*/],
     banner: { js: "#!/usr/bin/env node" },
     clean: false,

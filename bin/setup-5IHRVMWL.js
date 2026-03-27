@@ -1,18 +1,20 @@
 #!/usr/bin/env node
+import { createRequire } from "node:module";
+const require = createRequire(import.meta.url);
 import {
   authenticateCli
-} from "./chunk-NNTSHCFT.js";
+} from "./chunk-OF2HD2D5.js";
 import {
   DEFAULT_CONFIG
-} from "./chunk-YCAD3QRK.js";
+} from "./chunk-MBDCKNJI.js";
 import {
   ensureDir,
   getConfigPath,
   getStorageDir,
   readJson,
   writeJsonAtomic
-} from "./chunk-6RWSJQBF.js";
-import "./chunk-77HVPD4G.js";
+} from "./chunk-P2X3U3Y3.js";
+import "./chunk-DXOULAZU.js";
 
 // src/setup.ts
 import * as fs from "fs";

@@ -5,6 +5,7 @@ import { SessionsView } from "./views/sessions.js";
 import { ProjectsView } from "./views/projects.js";
 import { TrendsView } from "./views/trends.js";
 import { CommunityView } from "./views/community.js";
+import { APP_VERSION } from "../version.js";
 
 const VIEWS = [
   { key: "1", name: "Overview", component: OverviewView },
@@ -52,7 +53,7 @@ export function App() {
         justifyContent="space-between"
       >
         <Text bold color="cyan">
-          token-burningman v0.1.0
+          token-burningman v{APP_VERSION}
         </Text>
         <Text dimColor>
           {new Date().toLocaleDateString()} {new Date().toLocaleTimeString()}

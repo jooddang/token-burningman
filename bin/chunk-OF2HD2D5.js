@@ -1,8 +1,10 @@
 #!/usr/bin/env node
+import { createRequire } from "node:module";
+const require = createRequire(import.meta.url);
 import {
   getConfigPath,
   writeJsonAtomic
-} from "./chunk-6RWSJQBF.js";
+} from "./chunk-P2X3U3Y3.js";
 
 // src/auth.ts
 import * as https from "https";
