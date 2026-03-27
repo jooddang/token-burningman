@@ -21,13 +21,6 @@ Token usage analytics for [Claude Code](https://claude.ai/claude-code). Local-fi
 
 ## Installation
 
-### Standalone CLI (recommended)
-
-```bash
-npm install -g token-burningman
-burningman
-```
-
 ### Claude Code plugin (recommended)
 
 ```bash
