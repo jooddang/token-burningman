@@ -7,7 +7,7 @@
     "email": "gm@sfvibe.fun"
   },
   "license": "MIT",
-  "homepage": "https://github.com/sfvibe/token-burningman",
+  "homepage": "https://github.com/jooddang/token-burningman",
   "commands": "./commands/",
   "skills": "./skills/",
   "hooks": "./hooks/hooks.json",

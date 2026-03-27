@@ -6,10 +6,10 @@ import { ensureStorageDirs } from "../utils/storage.js";
 const args = process.argv.slice(2);
 
 if (args.includes("--help") || args.includes("-h")) {
-  console.log(`token-burningman TUI Dashboard v0.1.0
+  console.log(`burningman — Token usage analytics for Claude Code (v0.1.0)
 
 Usage:
-  token-burningman [options]
+  burningman [options]
 
 Options:
   --help, -h       Show this help message
@@ -25,7 +25,7 @@ Navigation:
 }
 
 if (args.includes("--version") || args.includes("-v")) {
-  console.log("token-burningman v0.1.0");
+  console.log("burningman v0.1.0");
   process.exit(0);
 }
 

@@ -30,6 +30,13 @@
     "typescript": "^5.7.0",
     "vitest": "^3.0.0"
   },
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jooddang/token-burningman.git"
+  },
   "author": "jooddang <gm@sfvibe.fun>",
   "license": "MIT"
 }

@@ -7,7 +7,7 @@ Thank you for your interest in contributing! This guide will help you get starte
 1. Fork the repository
 2. Clone your fork:
    ```bash
-   git clone https://github.com/YOUR_USERNAME/token-burningman.git
+   git clone https://github.com/<your-username>/token-burningman.git
    cd token-burningman/claude-usage
    ```
 3. Install dependencies:
