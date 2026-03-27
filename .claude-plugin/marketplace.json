@@ -10,7 +10,7 @@
     {
       "name": "token-burningman",
       "description": "Track Claude Code usage with statusline collection, hourly aggregation, native MCP summaries, and a full TUI dashboard.",
-      "version": "0.1.4",
+      "version": "0.1.5",
       "author": {
         "name": "jooddang",
         "email": "gm@sfvibe.fun"
@@ -34,5 +34,5 @@
       ]
     }
   ],
-  "version": "0.1.4"
+  "version": "0.1.5"
 }
