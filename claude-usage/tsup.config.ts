@@ -76,6 +76,7 @@ export default defineConfig([
     minify: false,
     sourcemap: false,
     external: ["react", "ink"],
+    banner: { js: "#!/usr/bin/env node" },
     clean: false,
   },
 ]);

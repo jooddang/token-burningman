@@ -23,8 +23,9 @@ describe("dashboard service and native renderers", () => {
     ensureStorageDirs();
 
     const now = Date.now();
-    const today = new Date(now).toISOString().slice(0, 10);
-    const hour = String(new Date(now).getHours());
+    const d = new Date(now);
+    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const hour = String(d.getHours());
 
     const entries: SessionEntry[] = [
       {

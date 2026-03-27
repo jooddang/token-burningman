@@ -4,8 +4,14 @@
   "description": "Token usage analytics for Claude Code. Local-first. Privacy-safe.",
   "type": "module",
   "bin": {
-    "token-burningman": "./bin/tui.js"
+    "burningman": "./bin/tui.js"
   },
+  "files": [
+    "bin/",
+    "commands/",
+    "hooks/",
+    ".claude-plugin/"
+  ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
