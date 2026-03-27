@@ -6,7 +6,7 @@
     "name": "jooddang",
     "email": "gm@sfvibe.fun"
   },
-  "license": "MIT",
+  "license": "FSL-1.1-MIT",
   "homepage": "https://github.com/jooddang/token-burningman",
   "commands": "./commands/",
   "skills": "./skills/",

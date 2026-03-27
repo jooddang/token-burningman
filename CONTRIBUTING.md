@@ -73,4 +73,4 @@ docs: update README with MCP configuration
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the MIT License.
+By contributing, you agree that your contributions will be licensed under the [FSL-1.1-MIT](LICENSE) license.

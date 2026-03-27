@@ -1,6 +1,6 @@
 # token-burningman
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License: FSL-1.1-MIT](https://img.shields.io/badge/License-FSL--1.1--MIT-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](https://nodejs.org)
 
 Token usage analytics for [Claude Code](https://claude.ai/claude-code). Local-first. Privacy-safe.
@@ -234,4 +234,6 @@ See [SECURITY.md](SECURITY.md) for vulnerability reporting.
 
 ## License
 
-[MIT](LICENSE)
+[FSL-1.1-MIT](LICENSE) — Functional Source License, Version 1.1, MIT Future License.
+
+Free to use, modify, and redistribute. The only restriction: you may not host a competing community reporting service. All local features (TUI, statusline, MCP, analytics, export) are unrestricted. On **2028-03-27**, the license automatically converts to MIT.
