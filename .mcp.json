@@ -2,7 +2,7 @@
   "mcpServers": {
     "token-burningman": {
       "command": "node",
-      "args": ["${PWD}/bin/mcp.cjs"]
+      "args": ["${CLAUDE_PLUGIN_ROOT}/bin/mcp.cjs"]
     }
   }
 }

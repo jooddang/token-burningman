@@ -1,16 +1,19 @@
 {
   "name": "token-burningman",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Token usage analytics for Claude Code with TUI, statusline, MCP, and opt-in community reporting. Local-first. Privacy-safe.",
   "type": "module",
   "bin": {
-    "burningman": "./bin/tui.js"
+    "burningman": "./bin/tui.js",
+    "token-burningman": "./bin/tui.js"
   },
   "files": [
     "bin/",
     "commands/",
     "hooks/",
-    ".claude-plugin/"
+    "skills/",
+    ".claude-plugin/",
+    ".mcp.json"
   ],
   "scripts": {
     "build": "tsup",
@@ -41,6 +44,14 @@
   "bugs": {
     "url": "https://github.com/jooddang/token-burningman/issues"
   },
+  "keywords": [
+    "claude-code",
+    "plugin",
+    "statusline",
+    "mcp",
+    "tui",
+    "analytics"
+  ],
   "author": "jooddang <gm@sfvibe.fun>",
   "license": "FSL-1.1-MIT"
 }

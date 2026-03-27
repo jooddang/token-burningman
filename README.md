@@ -44,12 +44,12 @@ This registers the MCP server, statusline hooks, and slash commands automaticall
 
 ```bash
 git clone https://github.com/jooddang/token-burningman.git
-cd token-burningman/claude-usage
+cd token-burningman
 npm install
 npm run build
 
 # Install as a local plugin
-claude plugin add ./claude-usage
+claude plugin add .
 ```
 
 ## Usage
@@ -59,7 +59,7 @@ claude plugin add ./claude-usage
 ```bash
 burningman              # after npm install -g
 # or
-node claude-usage/bin/tui.js   # from source
+node bin/tui.js         # from source
 ```
 
 | Key | Action |
@@ -172,8 +172,9 @@ All settings are stored in `~/.token-burningman/config.json`. The full default c
 ├── hourly/                       # Aggregated hourly buckets
 └── quota/                        # OAuth usage API cache
 
-claude-usage/
-├── .claude-plugin/plugin.json    # Plugin manifest for Claude Code
+repo root/
+├── .claude-plugin/               # Plugin + marketplace manifests
+├── .mcp.json                     # MCP server wiring
 ├── src/
 │   ├── collector.ts              # Statusline data collector (<50ms)
 │   ├── aggregator.ts             # Session → hourly aggregation
@@ -217,7 +218,6 @@ rm -rf ~/.token-burningman
 ## Development
 
 ```bash
-cd claude-usage
 npm install
 npm run dev    # Watch mode
 npm run test   # Run tests
