@@ -1,7 +1,7 @@
 {
   "name": "token-burningman",
   "version": "0.1.0",
-  "description": "Token usage analytics for Claude Code. Local-first. Privacy-safe.",
+  "description": "Token usage analytics for Claude Code with TUI, statusline, MCP, and opt-in community reporting. Local-first. Privacy-safe.",
   "author": {
     "name": "jooddang",
     "email": "gm@sfvibe.fun"

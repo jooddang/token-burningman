@@ -1,0 +1,124 @@
+Functional Source License, Version 1.1, MIT Future License
+
+Abbreviation
+
+FSL-1.1-MIT
+
+Notice
+
+Copyright 2026 jooddang (gm@sfvibe.fun)
+
+Terms and Conditions
+
+Licensor:             jooddang
+
+Licensed Work:        token-burningman 0.1.0
+                      The Licensed Work is (c) 2026 jooddang.
+
+Additional Use Grant: You may make use of the Licensed Work, provided that
+                      you may not use the Licensed Work for a Competing Use.
+                      A Competing Use means making the Licensed Work available
+                      to third parties as a hosted or managed service that
+                      substitutes for the community reporting functionality
+                      of the Licensed Work (specifically the public reporting
+                      API at sfvibe.fun or any replacement service operated
+                      by the Licensor).
+
+                      For clarity, the following uses are expressly permitted:
+                      - Using the TUI dashboard, statusline, MCP server, and
+                        all local analytics features without restriction
+                      - Modifying and redistributing the Licensed Work
+                      - Using the Licensed Work as a Claude Code plugin
+                      - Building products or services that incorporate the
+                        local analytics features of the Licensed Work
+                      - Connecting to the official community server at
+                        sfvibe.fun
+
+Change Date:          2028-03-27
+
+Change License:       MIT
+
+For information about alternative licensing arrangements for the Licensed Work,
+please contact: gm@sfvibe.fun
+
+-----------------------------------------------------------------------------
+
+Functional Source License, Version 1.1, MIT Future License
+
+Parameters
+
+Licensor:             The individual or entity offering the Licensed Work
+                      under these Terms and Conditions.
+
+Licensed Work:        The copyrightable work made available under these
+                      Terms and Conditions.
+
+Additional Use Grant: As set forth above.
+
+Change Date:          Four years from the date the Licensed Work is published.
+
+Change License:       MIT
+
+Terms and Conditions
+
+1. Grant of Rights
+
+(a) Subject to the conditions and limitations set forth herein, Licensor
+hereby grants you a non-exclusive, worldwide, non-transferable,
+non-sublicensable license to use, copy, modify, create derivative works,
+publicly perform, publicly display, and redistribute the Licensed Work.
+
+(b) The Additional Use Grant, if any, is hereby incorporated as an
+additional permission granted under this license.
+
+2. Limitations
+
+Notwithstanding the above, you may not make use of the Licensed Work in a
+manner that is a Competing Use.
+
+A "Competing Use" is use of the Licensed Work that could reasonably be
+considered to compete with, or substitute for, the Licensed Work or any
+product or service provided by the Licensor based on the Licensed Work.
+
+The Additional Use Grant may narrow the scope of what constitutes a
+Competing Use.
+
+3. Patents
+
+The Licensor hereby grants you a license, under any patent claims the
+Licensor can license or becomes able to license, to make, have made, use,
+sell, offer for sale, import, and otherwise transfer the Licensed Work, in
+each case subject to the conditions and limitations set forth in this license.
+
+4. Change License
+
+On the Change Date, or the fourth anniversary of the first publicly available
+distribution of a specific version of the Licensed Work under these Terms and
+Conditions, whichever comes first, the above conditions and limitations in
+Sections 1 and 2 will no longer apply to that specific version, and the
+Licensed Work may thereafter be used, copied, modified, created into
+derivative works, publicly performed, publicly displayed, and redistributed,
+subject to the conditions of the Change License.
+
+5. Disclaimer
+
+THE LICENSED WORK IS PROVIDED "AS IS". LICENSOR HEREBY DISCLAIMS ALL
+WARRANTIES, WHETHER EXPRESS, IMPLIED, STATUTORY, OR OTHERWISE. LICENSOR
+SPECIFICALLY DISCLAIMS ALL IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE, TITLE, AND NON-INFRINGEMENT, AND ALL WARRANTIES
+ARISING FROM COURSE OF DEALING, USAGE, OR TRADE PRACTICE. WITHOUT LIMITING
+THE FOREGOING, LICENSOR MAKES NO WARRANTY OF ANY KIND THAT THE LICENSED WORK,
+OR ANY PRODUCTS OR RESULTS OF THE USE THEREOF, WILL MEET YOUR OR ANY OTHER
+PERSON'S REQUIREMENTS, OPERATE WITHOUT INTERRUPTION, ACHIEVE ANY INTENDED
+RESULT, BE COMPATIBLE OR WORK WITH ANY SOFTWARE, SYSTEM, OR OTHER SERVICES,
+OR BE SECURE, ACCURATE, COMPLETE, FREE OF HARMFUL CODE, OR ERROR FREE.
+
+6. Limitation of Liability
+
+TO THE EXTENT NOT PROHIBITED BY LAW, IN NO EVENT WILL LICENSOR BE LIABLE FOR
+ANY LOST PROFITS, REVENUE, SALES, DATA, OR COSTS OF PROCUREMENT OF SUBSTITUTE
+GOODS OR SERVICES, OR FOR ANY DIRECT, INDIRECT, SPECIAL, INCIDENTAL,
+CONSEQUENTIAL, PUNITIVE, OR EXEMPLARY DAMAGES, HOWEVER CAUSED AND REGARDLESS
+OF THE THEORY OF LIABILITY, ARISING OUT OF OR RELATING TO THESE TERMS AND
+CONDITIONS OR THE USE OF OR INABILITY TO USE THE LICENSED WORK, EVEN IF
+LICENSOR HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.

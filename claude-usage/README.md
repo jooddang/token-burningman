@@ -1,181 +1,238 @@
 # token-burningman
 
-Token usage analytics for Claude Code. Local-first. Privacy-safe.
+[![License: FSL-1.1-MIT](https://img.shields.io/badge/License-FSL--1.1--MIT-blue.svg)](https://github.com/jooddang/token-burningman/blob/main/LICENSE)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](https://nodejs.org)
 
-## Overview
+Token usage analytics for [Claude Code](https://claude.ai/claude-code). Local-first. Privacy-safe.
 
-token-burningman is a Claude Code plugin that collects token usage telemetry from local sessions, provides rich TUI-based analytics, and optionally shares anonymized aggregate data to a community dashboard on [sfvibe.fun/burningman](https://sfvibe.fun/burningman).
+## Features
 
-**Two-layer architecture:**
-- **Local Layer**: Per-session, per-project, per-model analytics in a terminal TUI. Zero network dependency.
-- **Public Layer**: Opt-in, hourly-bucketed aggregate data submitted to a community API with ed25519 signatures.
+- **Local analytics** — Per-session, per-project, per-model token counts, costs, and trends. Zero network dependency.
+- **TUI dashboard** — 5 interactive views: Overview, Projects, Sessions, Trends, Community.
+- **Statusline integration** — Real-time token/cost display in your Claude Code status bar (`full`, `compact`, `minimal`, or `off`).
+- **MCP server** — Query usage data programmatically from Claude Code with 6 tools, 4 resources, and 2 prompts.
+- **Data export** — Export session or hourly data as JSON or CSV.
+- **Community reporting** (opt-in) — Share anonymized hourly aggregates to a public dashboard at [sfvibe.fun](https://sfvibe.fun). Only hourly bucketed totals are shared - no project names, file contents, or session IDs.
 
-## Quick Start
+## Prerequisites
 
-### 1. Install
+- **Node.js 20+**
+- **Claude Code** (for plugin/statusline features; the TUI works standalone)
+
+## Installation
+
+### Standalone CLI (recommended)
 
 ```bash
-cd token-burningman
-npm install && npm run build
+npm install -g token-burningman
+burningman
 ```
 
-### 2. Configure Statusline
+### Claude Code plugin (recommended)
 
-Add to `~/.claude/settings.json`:
+```bash
+# Add the marketplace
+claude plugin marketplace add jooddang/token-burningman
 
-```json
-{
-  "statusLine": {
-    "type": "command",
-    "command": "node /path/to/token-burningman/bin/collector.cjs"
-  }
+# Install the plugin
+claude plugin install token-burningman@jooddang
+```
+
+This registers the MCP server, statusline hooks, and slash commands automatically.
+
+### From source
+
+```bash
+git clone https://github.com/jooddang/token-burningman.git
+cd token-burningman/claude-usage
+npm install
+npm run build
+
+# Install as a local plugin
+claude plugin add ./claude-usage
+```
+
+## Usage
+
+### TUI Dashboard
+
+```bash
+burningman            # after npm install -g
+# or
+node bin/tui.js       # from the package root
+```
+
+| Key | Action |
+|-----|--------|
+| `1`-`5` | Switch views (Overview, Projects, Sessions, Trends, Community) |
+| `r` | Refresh data |
+| `[` / `]` | Change time range (Sessions view) |
+| `q` | Quit |
+
+### Statusline
+
+When installed as a Claude Code plugin, the statusline automatically displays real-time token usage and cost for the current session. Configure the format in `~/.token-burningman/config.json`:
+
+```jsonc
+"display": {
+  "statuslineFormat": "full"  // "full" | "compact" | "minimal" | "off"
 }
 ```
 
-**With OMC HUD coexistence** (runs both in parallel):
+### MCP Tools
 
-```json
-{
-  "statusLine": {
-    "type": "command",
-    "command": "node /path/to/token-burningman/bin/statusline-wrapper.mjs"
-  }
-}
-```
+When installed as a Claude Code plugin (or MCP server), the following tools are available:
 
-### 3. Use
+| Tool | Description |
+|------|-------------|
+| `get_overview` | Today's usage overview as Markdown |
+| `get_sessions` | Session history for a time range (`24h`, `48h`, `7d`) |
+| `get_projects` | Project-level token and cost breakdown (`7`, `30`, `90` days) |
+| `get_trends` | Daily cost, cache rate, and productivity trends (`7`, `30`, `90` days) |
+| `launch_tui` | Open the full TUI in tmux or a new terminal window |
+| `sync_report` | Manually submit unreported hourly data to the community server |
 
-Data collection starts automatically. View analytics:
+**MCP Resources** (read-only data endpoints):
+
+| URI | Description |
+|-----|-------------|
+| `burningman://overview` | Current usage overview |
+| `burningman://sessions/24h` | Session history (24h) |
+| `burningman://projects/30d` | Project breakdown (30d) |
+| `burningman://trends/30d` | Cost and productivity trends (30d) |
+
+**MCP Prompts**: `burningman-overview`, `burningman-projects`
+
+### Data Export
+
+Export session or hourly data as JSON or CSV via the `/export` slash command in Claude Code, or programmatically:
 
 ```bash
-# Launch TUI dashboard
-node bin/tui.js
-
-# Run aggregation (also runs on session end via hook)
-node bin/aggregate.cjs
+# Supported ranges: today, 7d, 30d, all
+# Supported formats: json, csv
+# Supported types: sessions, hourly
 ```
 
-## Statusline Formats
+### Community Reporting (opt-in)
 
-**Full** (default):
+Sign in via the **Community** tab in the TUI (press `5`, then `s`). After authentication, hourly aggregates are submitted automatically.
+
+Disable at any time:
+
+```jsonc
+"publicReporting": {
+  "enabled": false
+}
 ```
-[Opus] $3.45 | 62% ctx | 5h:18% 7d:4% | +200/-30 | cache:41%
-```
-
-**Compact**:
-```
-Opus $3.45 62%
-```
-
-**Minimal**:
-```
-$3.45 62%
-```
-
-Color coding:
-- Model: Opus=magenta, Sonnet=cyan, Haiku=green
-- Cost: yellow
-- Context %: green (<50%), yellow (50-75%), red (>75%)
-- Quota: green (<60%), yellow (60-80%), red (>80%)
-
-## TUI Dashboard
-
-Navigate with number keys:
-
-| Key | View | Description |
-|-----|------|-------------|
-| 1 | Overview | Today's KPIs, hourly chart, active sessions, quota |
-| 2 | Projects | Per-project cost/token breakdown, model mix |
-| 3 | Sessions | Session history, duration distribution |
-| 4 | Trends | Cost/cache trends, velocity index, weekly heatmap |
-| 5 | Community | Leaderboard, model adoption, community throughput |
-
-Other keys: `q` quit, `r` refresh, `[` `]` change time range.
 
 ## Configuration
 
-Config file: `~/.token-burningman/config.json`
+All settings are stored in `~/.token-burningman/config.json`. The full default configuration:
 
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `display.statuslineFormat` | `"full"` | `"full"`, `"compact"`, `"minimal"`, `"off"` |
-| `display.timezone` | `"system"` | IANA timezone string |
-| `alerts.quotaWarningThreshold` | `0.8` | Quota % that triggers warning |
-| `alerts.costDailyBudget` | `null` | Daily cost alert threshold |
-| `alerts.contextWarningPct` | `75` | Context % that turns red |
-| `collection.quotaPollingIntervalMin` | `60` | Minutes between quota API calls |
-| `collection.sessionRetentionDays` | `90` | Days to keep raw session data |
-| `tui.refreshIntervalSec` | `5` | TUI auto-refresh interval |
-| `publicReporting.enabled` | `false` | Opt-in to community reporting |
+```jsonc
+{
+  "version": 1,
+  "publicReporting": {
+    "enabled": false,                              // opt-in community reporting
+    "serverUrl": "https://sfvibe.fun/api/burningman",
+    "cliToken": null                               // set automatically after sign-in
+  },
+  "display": {
+    "statuslineFormat": "full",                    // "full" | "compact" | "minimal" | "off"
+    "currency": "USD",
+    "timezone": "system",
+    "colorScheme": "auto"
+  },
+  "collection": {
+    "enabled": true,
+    "quotaPollingIntervalMin": 60,                 // how often to check API quota
+    "hourlyMaintenanceIntervalMin": 60,
+    "sessionRetentionDays": 90,                    // auto-cleanup old sessions
+    "archiveAfterDays": 30
+  },
+  "alerts": {
+    "quotaWarningThreshold": 0.8,                  // warn at 80% quota usage
+    "costDailyBudget": null,                       // daily cost limit (USD), null = no limit
+    "contextWarningPct": 75                        // warn when context window > 75%
+  },
+  "tui": {
+    "defaultView": "overview",                     // initial TUI view
+    "refreshIntervalSec": 5,
+    "compactMode": false
+  }
+}
+```
 
-## Community Reporting
-
-To participate in the community dashboard:
-
-1. Run `/token-burningman:config` in Claude Code
-2. Choose a username and enable public reporting
-3. Your anonymized hourly aggregates will appear on sfvibe.fun/burningman
-
-**What's shared**: Hourly token counts, model, cache rates, session counts, lines changed.
-**What's NOT shared**: Project names, file contents, conversation data, session IDs, timestamps finer than hour buckets.
-
-Reports are signed with ed25519 to prevent spoofing.
-
-## Data Storage
+## Architecture
 
 ```
-~/.token-burningman/
-├── sessions/          # Per-session JSONL (~200 bytes/entry)
-├── hourly/            # Daily aggregated JSON
-├── quota/             # OAuth usage API cache
-└── config.json        # User configuration
+~/.token-burningman/              # Local data (never committed)
+├── config.json                   # User configuration + auth token
+├── sessions/                     # Per-session JSONL event logs
+├── hourly/                       # Aggregated hourly buckets
+└── quota/                        # OAuth usage API cache
+
+claude-usage/
+├── .claude-plugin/plugin.json    # Plugin manifest for Claude Code
+├── src/
+│   ├── collector.ts              # Statusline data collector (<50ms)
+│   ├── aggregator.ts             # Session -> hourly aggregation
+│   ├── maintenance.ts            # Hourly maintenance tasks
+│   ├── reporter.ts               # Community report submission
+│   ├── auth.ts                   # Browser-based SIWE authentication
+│   ├── quota.ts                  # OAuth quota fetching
+│   ├── analytics.ts              # Analytics computations
+│   ├── export.ts                 # JSON/CSV data export
+│   ├── mcp/                      # MCP server (tools, resources, prompts)
+│   ├── tui/                      # Terminal UI (React + Ink)
+│   ├── dashboard/                # Dashboard data service
+│   ├── presenters/               # Text renderers for each view
+│   └── utils/                    # Storage, formatting, delta helpers
+├── commands/                     # Plugin slash commands
+├── hooks/                        # Claude Code hook configuration
+├── skills/                       # Plugin skills
+└── tests/                        # Vitest test suite
 ```
 
-Estimated storage: ~6MB/month. Configurable retention (default 90 days).
+## Privacy
 
-## Plugin Commands
+- All data is stored locally in `~/.token-burningman/` with restricted file permissions (`0600`/`0700`).
+- Community reporting is **opt-in** and shares only hourly-bucketed aggregates.
+- No project names, file contents, session IDs, or fine-grained timestamps are ever transmitted.
+- All network requests use HTTPS with certificate validation enforced.
 
-| Command | Description |
-|---------|-------------|
-| `/token-burningman:dashboard` | Launch TUI dashboard |
-| `/token-burningman:config` | Interactive configuration |
-| `/token-burningman:status` | One-shot text summary |
-| `/token-burningman:report` | Generate markdown report |
-| `/token-burningman:export` | Export data as JSON/CSV |
+## Uninstall
+
+```bash
+# Remove global CLI
+npm uninstall -g token-burningman
+
+# Remove Claude Code plugin
+claude plugin uninstall token-burningman@jooddang
+
+# Remove local data (optional)
+rm -rf ~/.token-burningman
+```
 
 ## Development
 
 ```bash
-npm run build    # Build all entry points (tsup)
-npm run dev      # Watch mode
-npm run test     # Run tests (vitest)
+npm install
+npm run dev    # Watch mode
+npm run test   # Run tests
+npm run build  # Production build
 ```
 
-### Project Structure
+## Contributing
 
-```
-src/
-├── collector.ts          # Statusline data collector (<50ms)
-├── aggregator.ts         # Hourly aggregation
-├── quota.ts              # OAuth usage API client
-├── analytics.ts          # Derived metrics (projects, trends)
-├── reporter.ts           # Community report submission
-├── export.ts             # JSON/CSV export
-├── report.ts             # Text report generator
-├── types.ts              # Shared type definitions
-├── utils/
-│   ├── storage.ts        # JSONL/JSON file I/O
-│   ├── delta.ts          # Cumulative → delta calculation
-│   ├── format.ts         # Number/color formatting
-│   └── crypto.ts         # Ed25519 signing, hashing
-└── tui/
-    ├── app.tsx            # TUI root (ink)
-    ├── entry.tsx          # CLI entry point
-    ├── views/             # Overview, Projects, Sessions, Trends, Community
-    ├── components/        # KpiCard, BarChart, Table, Sparkline, Heatmap, ProgressBar
-    └── hooks/             # useSessionData, useConfig
-```
+See [CONTRIBUTING.md](https://github.com/jooddang/token-burningman/blob/main/CONTRIBUTING.md) for guidelines.
+
+## Security
+
+See [SECURITY.md](https://github.com/jooddang/token-burningman/blob/main/SECURITY.md) for vulnerability reporting.
 
 ## License
 
-MIT
+[FSL-1.1-MIT](https://github.com/jooddang/token-burningman/blob/main/LICENSE) - Functional Source License, Version 1.1, MIT Future License.
+
+Free to use, modify, and redistribute. The only restriction: you may not host a competing community reporting service. All local features (TUI, statusline, MCP, analytics, export) are unrestricted. On **2028-03-27**, the license automatically converts to MIT.
