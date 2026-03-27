@@ -38,7 +38,7 @@ claude plugin marketplace add jooddang/token-burningman
 claude plugin install token-burningman@jooddang
 ```
 
-This registers the MCP server, statusline hooks, and slash commands automatically.
+This registers the MCP server, session hooks, and slash commands automatically, and it will configure the HUD statusline for you when no different statusline command is already present.
 
 ### From source
 
@@ -71,11 +71,22 @@ node bin/tui.js         # from source
 
 ### Statusline
 
-When installed as a Claude Code plugin, the statusline automatically displays real-time token usage and cost for the current session. Configure the format in `~/.token-burningman/config.json`:
+When installed as a Claude Code plugin, setup now installs a stable HUD wrapper at `~/.token-burningman/bin/statusline.mjs` and points Claude Code's `statusLine` command at it if you do not already have a different statusline configured. Configure the format in `~/.token-burningman/config.json`:
 
 ```jsonc
 "display": {
   "statuslineFormat": "full"  // "full" | "compact" | "minimal" | "off"
+}
+```
+
+If you already use another statusline command, token-burningman will not overwrite it. In that case, point your existing wrapper at `~/.token-burningman/bin/statusline.mjs`, or if you installed from npm globally use:
+
+```json
+{
+  "statusLine": {
+    "type": "command",
+    "command": "burningman-statusline"
+  }
 }
 ```
 

@@ -20,6 +20,7 @@ import {
   sessionIdFromPath,
   writeJsonAtomic
 } from "./chunk-6RWSJQBF.js";
+import "./chunk-77HVPD4G.js";
 export {
   acquireLock,
   appendJsonl,

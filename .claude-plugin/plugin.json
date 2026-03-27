@@ -1,6 +1,6 @@
 {
   "name": "token-burningman",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Token usage analytics for Claude Code with TUI, statusline, MCP, and opt-in community reporting. Local-first. Privacy-safe.",
   "author": {
     "name": "jooddang",
@@ -40,5 +40,5 @@
     "brandColor": "#F59E0B"
   },
   "postInstall": "npm install && npm run build",
-  "setup": "node bin/collector.cjs"
+  "setup": "node bin/plugin-setup.cjs"
 }

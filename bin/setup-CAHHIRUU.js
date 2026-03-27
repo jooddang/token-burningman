@@ -12,6 +12,7 @@ import {
   readJson,
   writeJsonAtomic
 } from "./chunk-6RWSJQBF.js";
+import "./chunk-77HVPD4G.js";
 
 // src/setup.ts
 import * as fs from "fs";
