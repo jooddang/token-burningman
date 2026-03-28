@@ -24247,7 +24247,7 @@ function registerTools(server) {
 }
 
 // src/version.ts
-var APP_VERSION = "0.1.7";
+var APP_VERSION = "0.1.8";
 
 // src/mcp/server.ts
 async function main() {
