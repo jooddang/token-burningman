@@ -1,9 +1,19 @@
-# token-burningman
+<p align="center">
+  <img src="images/icon.png" width="128" alt="token-burningman icon" />
+</p>
 
-[![License: FSL-1.1-MIT](https://img.shields.io/badge/License-FSL--1.1--MIT-blue.svg)](LICENSE)
-[![Node.js](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](https://nodejs.org)
+<h1 align="center">token-burningman</h1>
 
-Token usage analytics for [Claude Code](https://claude.ai/claude-code). Local-first. Privacy-safe.
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-FSL--1.1--MIT-blue.svg" alt="License: FSL-1.1-MIT" /></a>
+  <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg" alt="Node.js" /></a>
+</p>
+
+<p align="center">Token usage analytics for <a href="https://claude.ai/claude-code">Claude Code</a>. Local-first. Privacy-safe.</p>
+
+<p align="center">
+  <img src="images/ss3.png" width="720" alt="token-burningman overview dashboard" />
+</p>
 
 ## Features
 
@@ -69,6 +79,16 @@ node bin/tui.js         # from source
 | `[` / `]` | Change time range (Sessions view) |
 | `q` | Quit |
 
+<p align="center">
+  <img src="images/ss1.png" width="720" alt="Projects cost breakdown" />
+</p>
+<p align="center">
+  <img src="images/ss2.png" width="720" alt="Projects and sessions detail" />
+</p>
+<p align="center">
+  <img src="images/ss4.png" width="720" alt="Projects view with charts" />
+</p>
+
 ### Statusline
 
 When installed as a Claude Code plugin, setup now installs a stable HUD wrapper at `~/.token-burningman/bin/statusline.mjs` and points Claude Code's `statusLine` command at it if you do not already have a different statusline configured. Configure the format in `~/.token-burningman/config.json`:
@@ -125,6 +145,10 @@ Export session or hourly data as JSON or CSV via the `/export` slash command in 
 ```
 
 ### Community Reporting (opt-in)
+
+<p align="center">
+  <img src="images/ss5.png" width="720" alt="Community dashboard" />
+</p>
 
 Sign in via the **Community** tab in the TUI (press `5`, then `s`). After authentication, hourly aggregates are submitted automatically.
 
