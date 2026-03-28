@@ -31,13 +31,6 @@
 
 ## Installation
 
-### Standalone CLI (recommended)
-
-```bash
-npm install -g token-burningman
-burningman
-```
-
 ### Claude Code plugin (recommended)
 
 ```bash
