@@ -145,6 +145,15 @@ Export session or hourly data as JSON or CSV via the `/export` slash command in 
 
 Sign in via the **Community** tab in the TUI (press `5`, then `s`). After authentication, hourly aggregates are submitted automatically.
 
+<p align="center">
+  <img src="images/burningman social board.png" width="720" alt="SFvibe.fun community social board" />
+</p>
+
+<p align="center">
+  <b>See how the community burns tokens at <a href="https://sfvibe.fun/burningman">sfvibe.fun/burningman</a></b><br/>
+  Compare your usage, explore leaderboards, and join the conversation.
+</p>
+
 Disable at any time:
 
 ```jsonc

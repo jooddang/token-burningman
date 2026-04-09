@@ -13,7 +13,7 @@ interface ClaudeSettings {
 }
 
 interface SetupResult {
-  status: "installed" | "updated" | "already-configured" | "skipped-existing";
+  status: "installed" | "updated" | "wrapper-updated" | "already-configured" | "skipped-existing";
   wrapperPath: string;
   message: string;
 }
@@ -27,6 +27,10 @@ export function getClaudeSettingsPath(): string {
 
 export function getHudWrapperPath(): string {
   return path.join(getStorageDir(), "bin", "statusline.mjs");
+}
+
+export function getPluginRootFilePath(): string {
+  return path.join(getStorageDir(), ".plugin-root");
 }
 
 export function getPluginRootFromScript(scriptPath: string): string {
@@ -45,12 +49,15 @@ function escapeForJs(value: string): string {
   return JSON.stringify(value);
 }
 
-function buildWrapperSource(collectorPath: string): string {
-  const encodedCollectorPath = escapeForJs(collectorPath);
+function buildWrapperSource(pluginRootFilePath: string): string {
+  const encodedPath = escapeForJs(pluginRootFilePath);
   return `#!/usr/bin/env node
+import { readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
+import { join } from "node:path";
 
-const collectorPath = ${encodedCollectorPath};
+const pluginRoot = readFileSync(${encodedPath}, "utf8").trim();
+const collectorPath = join(pluginRoot, "bin", "collector.cjs");
 const result = spawnSync(process.execPath, [collectorPath], {
   stdio: "inherit",
   env: process.env,
@@ -72,12 +79,26 @@ function isBurningmanStatusLine(command: string | undefined): boolean {
 
 export function installHudStatusLine(pluginRoot: string): SetupResult {
   const collectorPath = path.join(pluginRoot, "bin", "collector.cjs");
+  if (!fs.existsSync(collectorPath)) {
+    throw new Error(`collector.cjs not found at ${collectorPath}. Is the plugin built?`);
+  }
+
+  const pluginRootFile = getPluginRootFilePath();
   const wrapperPath = getHudWrapperPath();
   const wrapperCommand = `node ${JSON.stringify(wrapperPath)}`;
-  const wrapperSource = buildWrapperSource(collectorPath);
+  const wrapperSource = buildWrapperSource(pluginRootFile);
 
+  // Check if pluginRoot changed from previous install
+  ensureDir(path.dirname(pluginRootFile));
+  const previousRoot = fs.existsSync(pluginRootFile)
+    ? JSON.parse(fs.readFileSync(pluginRootFile, "utf8")) as string
+    : "";
+  const pluginRootChanged = previousRoot !== pluginRoot;
+  writeJsonAtomic(pluginRootFile, pluginRoot);
+
+  // Write wrapper (content is stable across versions since it reads .plugin-root at runtime)
   ensureDir(path.dirname(wrapperPath));
-  fs.writeFileSync(wrapperPath, wrapperSource, { encoding: "utf8", mode: 0o700 });
+  fs.writeFileSync(wrapperPath, wrapperSource, "utf8");
   fs.chmodSync(wrapperPath, 0o700);
 
   const settingsPath = getClaudeSettingsPath();
@@ -87,9 +108,11 @@ export function installHudStatusLine(pluginRoot: string): SetupResult {
   if (existing?.type === "command") {
     if (existing.command === wrapperCommand) {
       return {
-        status: "already-configured",
+        status: pluginRootChanged ? "wrapper-updated" : "already-configured",
         wrapperPath,
-        message: `HUD already configured at ${wrapperPath}`,
+        message: pluginRootChanged
+          ? `Updated plugin root to ${pluginRoot}`
+          : `HUD already configured at ${wrapperPath}`,
       };
     }
 

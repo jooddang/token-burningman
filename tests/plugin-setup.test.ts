@@ -2,7 +2,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { getHudWrapperPath, getPluginRootFromScript, installHudStatusLine } from "../src/plugin-setup.js";
+import { getHudWrapperPath, getPluginRootFilePath, getPluginRootFromScript, installHudStatusLine } from "../src/plugin-setup.js";
 
 describe("plugin setup HUD installation", () => {
   let tempHome: string;
@@ -44,14 +44,27 @@ describe("plugin setup HUD installation", () => {
     fs.rmSync(tempHome, { recursive: true, force: true });
   });
 
+  function createFakePlugin(pluginRoot: string): void {
+    const binDir = path.join(pluginRoot, "bin");
+    fs.mkdirSync(binDir, { recursive: true });
+    fs.writeFileSync(path.join(binDir, "collector.cjs"), "// fake collector", "utf8");
+  }
+
   it("installs the HUD wrapper when no statusLine exists", () => {
-    const pluginRoot = "/tmp/token-burningman-plugin";
+    const pluginRoot = path.join(tempHome, "plugin-v1");
+    createFakePlugin(pluginRoot);
     const result = installHudStatusLine(pluginRoot);
     const wrapperPath = getHudWrapperPath();
+    const pluginRootFile = getPluginRootFilePath();
 
     expect(result.status).toBe("installed");
     expect(fs.existsSync(wrapperPath)).toBe(true);
-    expect(fs.readFileSync(wrapperPath, "utf8")).toContain(path.join(pluginRoot, "bin", "collector.cjs"));
+    // Wrapper should reference .plugin-root file, not a hardcoded collector path
+    const wrapperContent = fs.readFileSync(wrapperPath, "utf8");
+    expect(wrapperContent).toContain(".plugin-root");
+    expect(wrapperContent).not.toContain(path.join(pluginRoot, "bin", "collector.cjs"));
+    // .plugin-root should contain the pluginRoot
+    expect(JSON.parse(fs.readFileSync(pluginRootFile, "utf8"))).toBe(pluginRoot);
 
     const settings = JSON.parse(fs.readFileSync(tempSettingsPath, "utf8")) as {
       statusLine: { type: string; command: string };
@@ -61,6 +74,8 @@ describe("plugin setup HUD installation", () => {
   });
 
   it("does not overwrite an unrelated existing statusLine", () => {
+    const pluginRoot = path.join(tempHome, "plugin-skip");
+    createFakePlugin(pluginRoot);
     fs.mkdirSync(path.dirname(tempSettingsPath), { recursive: true });
     fs.writeFileSync(
       tempSettingsPath,
@@ -77,13 +92,51 @@ describe("plugin setup HUD installation", () => {
       "utf8",
     );
 
-    const result = installHudStatusLine("/tmp/token-burningman-plugin");
+    const result = installHudStatusLine(pluginRoot);
     const settings = JSON.parse(fs.readFileSync(tempSettingsPath, "utf8")) as {
       statusLine: { type: string; command: string };
     };
 
     expect(result.status).toBe("skipped-existing");
     expect(settings.statusLine.command).toBe("node /tmp/other-statusline.js");
+  });
+
+  it("updates .plugin-root on version upgrade without touching settings", () => {
+    const oldRoot = path.join(tempHome, "plugin-0.1.5");
+    const newRoot = path.join(tempHome, "plugin-0.1.7");
+    createFakePlugin(oldRoot);
+    createFakePlugin(newRoot);
+
+    const result1 = installHudStatusLine(oldRoot);
+    expect(result1.status).toBe("installed");
+
+    const pluginRootFile = getPluginRootFilePath();
+    expect(JSON.parse(fs.readFileSync(pluginRootFile, "utf8"))).toBe(oldRoot);
+
+    const result2 = installHudStatusLine(newRoot);
+    expect(result2.status).toBe("wrapper-updated");
+    expect(JSON.parse(fs.readFileSync(pluginRootFile, "utf8"))).toBe(newRoot);
+
+    // Wrapper content should NOT contain any version-specific path
+    const wrapperContent = fs.readFileSync(getHudWrapperPath(), "utf8");
+    expect(wrapperContent).not.toContain(oldRoot);
+    expect(wrapperContent).not.toContain(newRoot);
+    expect(wrapperContent).toContain(".plugin-root");
+  });
+
+  it("returns already-configured when nothing changed", () => {
+    const pluginRoot = path.join(tempHome, "plugin-same");
+    createFakePlugin(pluginRoot);
+
+    installHudStatusLine(pluginRoot);
+    const result = installHudStatusLine(pluginRoot);
+    expect(result.status).toBe("already-configured");
+  });
+
+  it("throws when collector.cjs does not exist", () => {
+    const badRoot = path.join(tempHome, "plugin-missing");
+    fs.mkdirSync(badRoot, { recursive: true });
+    expect(() => installHudStatusLine(badRoot)).toThrow("collector.cjs not found");
   });
 
   it("prefers the explicit CLAUDE_PLUGIN_ROOT override", () => {
