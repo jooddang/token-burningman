@@ -6,7 +6,7 @@ import {
 } from "./chunk-OF2HD2D5.js";
 import {
   DEFAULT_CONFIG
-} from "./chunk-MBDCKNJI.js";
+} from "./chunk-GBNYSLYD.js";
 import {
   ensureDir,
   getConfigPath,

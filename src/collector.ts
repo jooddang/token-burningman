@@ -4,7 +4,7 @@ import type { StatuslineInput, SessionEntry, Config } from "./types.js";
 import { DEFAULT_CONFIG } from "./types.js";
 import { appendJsonl, getSessionFilePath, getConfigPath, ensureStorageDirs } from "./utils/storage.js";
 import type { QuotaState } from "./types.js";
-import { shouldFetchQuota, triggerQuotaFetchBackground, readQuotaState } from "./quota.js";
+import { shouldFetchQuota, triggerQuotaFetchBackground, readQuotaState, markQuotaFetchTriggered } from "./quota.js";
 import { shouldRunHourlyMaintenance, triggerHourlyMaintenanceBackground } from "./maintenance.js";
 import {
   fmtCost,
@@ -164,7 +164,9 @@ function main(): void {
   process.stdout.write(line);
 
   // Maybe trigger background quota fetch (non-blocking)
-  if (shouldFetchQuota(config)) {
+  const totalTokens = entry.tin + entry.tout;
+  if (shouldFetchQuota(config, totalTokens, entry.sid)) {
+    markQuotaFetchTriggered(totalTokens, entry.sid);
     triggerQuotaFetchBackground(path.dirname(process.argv[1] || __filename));
   }
 

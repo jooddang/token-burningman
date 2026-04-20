@@ -2,12 +2,13 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as https from "node:https";
 import { execFileSync } from "node:child_process";
-import type { QuotaState, Config } from "./types.js";
+import type { QuotaState, QuotaTriggerState, Config } from "./types.js";
 import { readJson, writeJsonAtomic, appendJsonl, getStorageDir, acquireLock, releaseLock } from "./utils/storage.js";
 
 const QUOTA_STATE_PATH = () => path.join(getStorageDir(), "quota", "state.json");
 const QUOTA_HISTORY_PATH = () => path.join(getStorageDir(), "quota", "history.jsonl");
 const QUOTA_LOCK_PATH = () => path.join(getStorageDir(), "quota", "fetch.lock");
+const QUOTA_TRIGGER_PATH = () => path.join(getStorageDir(), "quota", "trigger.json");
 
 const DEFAULT_QUOTA_STATE: QuotaState = {
   lastFetchedAt: 0,
@@ -15,14 +16,57 @@ const DEFAULT_QUOTA_STATE: QuotaState = {
   seven_day: null,
 };
 
+const DEFAULT_QUOTA_TRIGGER: QuotaTriggerState = {
+  lastTriggerAt: 0,
+  tokensAtLastTrigger: 0,
+  sid: "",
+};
+
 export function readQuotaState(): QuotaState {
   return readJson<QuotaState>(QUOTA_STATE_PATH(), DEFAULT_QUOTA_STATE);
 }
 
-export function shouldFetchQuota(config: Config): boolean {
+export function readQuotaTrigger(): QuotaTriggerState {
+  return readJson<QuotaTriggerState>(QUOTA_TRIGGER_PATH(), DEFAULT_QUOTA_TRIGGER);
+}
+
+export function markQuotaFetchTriggered(tokens: number, sid: string): void {
+  writeJsonAtomic(QUOTA_TRIGGER_PATH(), {
+    lastTriggerAt: Date.now(),
+    tokensAtLastTrigger: tokens,
+    sid,
+  });
+}
+
+/**
+ * Hybrid gating: min-second floor + interval ceiling + token-delta fast path.
+ * - Below `quotaPollingMinSec`: never refetch (rate-limit guard).
+ * - At/above `quotaPollingIntervalMin`: always refetch (freshness ceiling).
+ * - In between: refetch when cumulative token delta since last trigger exceeds
+ *   `quotaPollingTokenDelta`, or when the session id changed.
+ */
+export function shouldFetchQuota(
+  config: Config,
+  currentTokens: number = 0,
+  sid: string = "",
+): boolean {
   const state = readQuotaState();
-  const intervalMs = (config.collection?.quotaPollingIntervalMin ?? 60) * 60_000;
-  return Date.now() - state.lastFetchedAt >= intervalMs;
+  const trigger = readQuotaTrigger();
+  const now = Date.now();
+  const lastActivityAt = Math.max(state.lastFetchedAt, trigger.lastTriggerAt);
+  const elapsed = now - lastActivityAt;
+
+  const minMs = (config.collection?.quotaPollingMinSec ?? 30) * 1000;
+  const intervalMs = (config.collection?.quotaPollingIntervalMin ?? 1) * 60_000;
+
+  if (elapsed < minMs) return false;
+  if (elapsed >= intervalMs) return true;
+
+  if (sid && trigger.sid && sid !== trigger.sid) return true;
+
+  const threshold = config.collection?.quotaPollingTokenDelta ?? 20000;
+  const delta = currentTokens - trigger.tokensAtLastTrigger;
+  return delta >= threshold;
 }
 
 /**
@@ -130,9 +174,9 @@ export async function fetchQuotaSafe(config: Config): Promise<QuotaState | null>
 
   try {
     const state = readQuotaState();
-    const intervalMs = (config.collection?.quotaPollingIntervalMin ?? 60) * 60_000;
-    if (Date.now() - state.lastFetchedAt < intervalMs) {
-      return state; // Another session just fetched
+    const minMs = (config.collection?.quotaPollingMinSec ?? 30) * 1000;
+    if (Date.now() - state.lastFetchedAt < minMs) {
+      return state; // Another session just fetched within the rate-limit floor
     }
 
     const token = getOAuthToken();

@@ -211,8 +211,8 @@ async function fetchQuotaSafe(config) {
   }
   try {
     const state = readQuotaState();
-    const intervalMs = (config.collection?.quotaPollingIntervalMin ?? 60) * 6e4;
-    if (Date.now() - state.lastFetchedAt < intervalMs) {
+    const minMs = (config.collection?.quotaPollingMinSec ?? 30) * 1e3;
+    if (Date.now() - state.lastFetchedAt < minMs) {
       return state;
     }
     const token = getOAuthToken();
@@ -251,7 +251,9 @@ var DEFAULT_CONFIG = {
   },
   collection: {
     enabled: true,
-    quotaPollingIntervalMin: 60,
+    quotaPollingIntervalMin: 1,
+    quotaPollingMinSec: 30,
+    quotaPollingTokenDelta: 2e4,
     hourlyMaintenanceIntervalMin: 60,
     sessionRetentionDays: 90,
     archiveAfterDays: 30

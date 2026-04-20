@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 import {
   DEFAULT_CONFIG
-} from "./chunk-MBDCKNJI.js";
+} from "./chunk-GBNYSLYD.js";
 import "./chunk-DXOULAZU.js";
 export {
   DEFAULT_CONFIG

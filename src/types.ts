@@ -104,6 +104,15 @@ export interface QuotaState {
   seven_day: { utilization: number; resets_at: string } | null;
 }
 
+// Lightweight activity tracker for quota-fetch trigger decisions.
+// Written by the collector on every tick that decides to trigger a fetch,
+// read by shouldFetchQuota to compute a token delta since the last trigger.
+export interface QuotaTriggerState {
+  lastTriggerAt: number;
+  tokensAtLastTrigger: number;
+  sid: string;
+}
+
 // Per-project analytics summary
 export interface ProjectStat {
   project: string;
@@ -150,6 +159,8 @@ export interface Config {
   collection: {
     enabled: boolean;
     quotaPollingIntervalMin: number;
+    quotaPollingMinSec: number;
+    quotaPollingTokenDelta: number;
     hourlyMaintenanceIntervalMin: number;
     sessionRetentionDays: number;
     archiveAfterDays: number;
@@ -181,7 +192,9 @@ export const DEFAULT_CONFIG: Config = {
   },
   collection: {
     enabled: true,
-    quotaPollingIntervalMin: 60,
+    quotaPollingIntervalMin: 1,
+    quotaPollingMinSec: 30,
+    quotaPollingTokenDelta: 20000,
     hourlyMaintenanceIntervalMin: 60,
     sessionRetentionDays: 90,
     archiveAfterDays: 30,

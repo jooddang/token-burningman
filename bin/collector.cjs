@@ -43,7 +43,9 @@ var DEFAULT_CONFIG = {
   },
   collection: {
     enabled: true,
-    quotaPollingIntervalMin: 60,
+    quotaPollingIntervalMin: 1,
+    quotaPollingMinSec: 30,
+    quotaPollingTokenDelta: 2e4,
     hourlyMaintenanceIntervalMin: 60,
     sessionRetentionDays: 90,
     archiveAfterDays: 30
@@ -112,6 +114,17 @@ function readJson(filePath, fallback) {
     return fallback;
   }
 }
+function writeJsonAtomic(filePath, data) {
+  ensureDir(path.dirname(filePath));
+  const tmpPath = filePath + ".tmp";
+  const fd = fs.openSync(tmpPath, "w", 384);
+  try {
+    fs.writeSync(fd, JSON.stringify(data, null, 2));
+  } finally {
+    fs.closeSync(fd);
+  }
+  fs.renameSync(tmpPath, filePath);
+}
 var DEFAULT_LOCK_STALE_MS = 15 * 6e4;
 
 // src/quota.ts
@@ -120,18 +133,44 @@ var path2 = __toESM(require("path"), 1);
 var https = __toESM(require("https"), 1);
 var import_node_child_process = require("child_process");
 var QUOTA_STATE_PATH = () => path2.join(getStorageDir(), "quota", "state.json");
+var QUOTA_TRIGGER_PATH = () => path2.join(getStorageDir(), "quota", "trigger.json");
 var DEFAULT_QUOTA_STATE = {
   lastFetchedAt: 0,
   five_hour: null,
   seven_day: null
 };
+var DEFAULT_QUOTA_TRIGGER = {
+  lastTriggerAt: 0,
+  tokensAtLastTrigger: 0,
+  sid: ""
+};
 function readQuotaState() {
   return readJson(QUOTA_STATE_PATH(), DEFAULT_QUOTA_STATE);
 }
-function shouldFetchQuota(config) {
+function readQuotaTrigger() {
+  return readJson(QUOTA_TRIGGER_PATH(), DEFAULT_QUOTA_TRIGGER);
+}
+function markQuotaFetchTriggered(tokens, sid) {
+  writeJsonAtomic(QUOTA_TRIGGER_PATH(), {
+    lastTriggerAt: Date.now(),
+    tokensAtLastTrigger: tokens,
+    sid
+  });
+}
+function shouldFetchQuota(config, currentTokens = 0, sid = "") {
   const state = readQuotaState();
-  const intervalMs = (config.collection?.quotaPollingIntervalMin ?? 60) * 6e4;
-  return Date.now() - state.lastFetchedAt >= intervalMs;
+  const trigger = readQuotaTrigger();
+  const now = Date.now();
+  const lastActivityAt = Math.max(state.lastFetchedAt, trigger.lastTriggerAt);
+  const elapsed = now - lastActivityAt;
+  const minMs = (config.collection?.quotaPollingMinSec ?? 30) * 1e3;
+  const intervalMs = (config.collection?.quotaPollingIntervalMin ?? 1) * 6e4;
+  if (elapsed < minMs) return false;
+  if (elapsed >= intervalMs) return true;
+  if (sid && trigger.sid && sid !== trigger.sid) return true;
+  const threshold = config.collection?.quotaPollingTokenDelta ?? 2e4;
+  const delta = currentTokens - trigger.tokensAtLastTrigger;
+  return delta >= threshold;
 }
 function triggerQuotaFetchBackground(binDir) {
   const script = path2.join(binDir, "fetch-quota-bg.cjs");
@@ -367,7 +406,9 @@ function main() {
   const config = readConfig();
   const line = formatStatusline(entry, config);
   process.stdout.write(line);
-  if (shouldFetchQuota(config)) {
+  const totalTokens = entry.tin + entry.tout;
+  if (shouldFetchQuota(config, totalTokens, entry.sid)) {
+    markQuotaFetchTriggered(totalTokens, entry.sid);
     triggerQuotaFetchBackground(path5.dirname(process.argv[1] || __filename));
   }
   if (shouldRunHourlyMaintenance(config)) {

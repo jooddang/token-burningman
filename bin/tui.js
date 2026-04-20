@@ -7,7 +7,7 @@ import {
 } from "./chunk-OF2HD2D5.js";
 import {
   DEFAULT_CONFIG
-} from "./chunk-MBDCKNJI.js";
+} from "./chunk-GBNYSLYD.js";
 import {
   ensureStorageDirs,
   getConfigPath,
@@ -31201,7 +31201,7 @@ function CommunityView() {
         if (input === "s" && (authState === "unauthenticated" || authState === "error")) {
           setAuthState("authenticating");
           setAuthMessage("Opening browser...");
-          import("./setup-5IHRVMWL.js").then(({ ensureConfig }) => {
+          import("./setup-47TEJ4GT.js").then(({ ensureConfig }) => {
             const freshConfig = ensureConfig();
             return authenticateCli(freshConfig);
           }).then((ok) => {
@@ -31223,7 +31223,7 @@ function CommunityView() {
         }
         if (input === "o" && authState === "authenticated") {
           import("./storage-KCM6WV3Y.js").then(({ getConfigPath: getConfigPath2, readJson: readJson2, writeJsonAtomic: writeJsonAtomic2 }) => {
-            import("./types-YDPPSSNT.js").then(({ DEFAULT_CONFIG: DEFAULT_CONFIG2 }) => {
+            import("./types-GH667CEZ.js").then(({ DEFAULT_CONFIG: DEFAULT_CONFIG2 }) => {
               const cfg = readJson2(getConfigPath2(), DEFAULT_CONFIG2);
               cfg.publicReporting.cliToken = null;
               cfg.publicReporting.enabled = false;
