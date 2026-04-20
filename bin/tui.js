@@ -31384,7 +31384,7 @@ function CommunityView() {
 }
 
 // src/version.ts
-var APP_VERSION = "0.1.9";
+var APP_VERSION = "0.1.10";
 
 // src/tui/app.tsx
 var import_jsx_runtime12 = __toESM(require_jsx_runtime(), 1);
