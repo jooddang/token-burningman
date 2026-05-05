@@ -3223,8 +3223,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path6) {
-      let input = path6;
+    function removeDotSegments(path7) {
+      let input = path7;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -3423,8 +3423,8 @@ var require_schemes = __commonJS({
         wsComponent.secure = void 0;
       }
       if (wsComponent.resourceName) {
-        const [path6, query] = wsComponent.resourceName.split("?");
-        wsComponent.path = path6 && path6 !== "/" ? path6 : void 0;
+        const [path7, query] = wsComponent.resourceName.split("?");
+        wsComponent.path = path7 && path7 !== "/" ? path7 : void 0;
         wsComponent.query = query;
         wsComponent.resourceName = void 0;
       }
@@ -3483,7 +3483,7 @@ var require_schemes = __commonJS({
       urnComponent.nss = (uuidComponent.uuid || "").toLowerCase();
       return urnComponent;
     }
-    var http2 = (
+    var http3 = (
       /** @type {SchemeHandler} */
       {
         scheme: "http",
@@ -3492,11 +3492,11 @@ var require_schemes = __commonJS({
         serialize: httpSerialize
       }
     );
-    var https3 = (
+    var https4 = (
       /** @type {SchemeHandler} */
       {
         scheme: "https",
-        domainHost: http2.domainHost,
+        domainHost: http3.domainHost,
         parse: httpParse,
         serialize: httpSerialize
       }
@@ -3540,8 +3540,8 @@ var require_schemes = __commonJS({
     var SCHEMES = (
       /** @type {Record<SchemeName, SchemeHandler>} */
       {
-        http: http2,
-        https: https3,
+        http: http3,
+        https: https4,
         ws,
         wss,
         urn,
@@ -6786,12 +6786,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list, fs6, exportName) {
+    function addFormats(ajv, list, fs8, exportName) {
       var _a2;
       var _b;
       (_a2 = (_b = ajv.opts.code).formats) !== null && _a2 !== void 0 ? _a2 : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list)
-        ajv.addFormat(f, fs6[f]);
+        ajv.addFormat(f, fs8[f]);
     }
     module2.exports = exports2 = formatsPlugin;
     Object.defineProperty(exports2, "__esModule", { value: true });
@@ -7158,8 +7158,8 @@ function getErrorMap() {
 
 // node_modules/.pnpm/zod@4.3.6/node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path6, errorMaps, issueData } = params;
-  const fullPath = [...path6, ...issueData.path || []];
+  const { data, path: path7, errorMaps, issueData } = params;
+  const fullPath = [...path7, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -7274,11 +7274,11 @@ var errorUtil;
 
 // node_modules/.pnpm/zod@4.3.6/node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path6, key) {
+  constructor(parent, value, path7, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path6;
+    this._path = path7;
     this._key = key;
   }
   get path() {
@@ -10922,10 +10922,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path6) {
-  if (!path6)
+function getElementAtPath(obj, path7) {
+  if (!path7)
     return obj;
-  return path6.reduce((acc, key) => acc?.[key], obj);
+  return path7.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -11308,11 +11308,11 @@ function aborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path6, issues) {
+function prefixIssues(path7, issues) {
   return issues.map((iss) => {
     var _a2;
     (_a2 = iss).path ?? (_a2.path = []);
-    iss.path.unshift(path6);
+    iss.path.unshift(path7);
     return iss;
   });
 }
@@ -23221,11 +23221,17 @@ function getSessionsDir() {
 function getHourlyDir() {
   return path.join(getStorageDir(), "hourly");
 }
+function getSessionFilePath(sessionId) {
+  return path.join(getSessionsDir(), `${sessionId}.jsonl`);
+}
 function getHourlyFilePath(dateStr) {
   return path.join(getHourlyDir(), `${dateStr}.json`);
 }
 function getConfigPath() {
   return path.join(getStorageDir(), "config.json");
+}
+function getAggregationMetaPath() {
+  return path.join(getStorageDir(), ".aggregation-meta.json");
 }
 function ensureDir(dirPath) {
   if (!fs.existsSync(dirPath)) {
@@ -23236,6 +23242,16 @@ function ensureStorageDirs() {
   ensureDir(getSessionsDir());
   ensureDir(getHourlyDir());
   ensureDir(path.join(getStorageDir(), "quota"));
+}
+function appendJsonl(filePath, entry) {
+  ensureDir(path.dirname(filePath));
+  const line = JSON.stringify(entry) + "\n";
+  const fd = fs.openSync(filePath, "a", 384);
+  try {
+    fs.writeSync(fd, line);
+  } finally {
+    fs.closeSync(fd);
+  }
 }
 function readJsonl(filePath) {
   if (!fs.existsSync(filePath)) return [];
@@ -23356,12 +23372,16 @@ function normalizeQuotaUtilization(value) {
 var MODEL_NAMES = {
   "claude-opus-4-6": "Opus",
   "claude-sonnet-4-6": "Sonnet",
-  "claude-haiku-4-5-20251001": "Haiku"
+  "claude-haiku-4-5-20251001": "Haiku",
+  "gpt-5.5": "GPT-5.5",
+  "gpt-5.4": "GPT-5.4",
+  "gpt-5.3-codex": "GPT-5.3 Codex"
 };
 function modelDisplayName(modelId) {
   if (MODEL_NAMES[modelId]) return MODEL_NAMES[modelId];
   const match = modelId.match(/claude-(\w+)-/);
   if (match) return match[1].charAt(0).toUpperCase() + match[1].slice(1);
+  if (modelId.startsWith("gpt-")) return modelId.toUpperCase();
   return modelId;
 }
 function cacheHitRate(cacheRead, inputTokens) {
@@ -24154,6 +24174,464 @@ var DEFAULT_CONFIG = {
   }
 };
 
+// src/setup.ts
+var fs6 = __toESM(require("fs"), 1);
+
+// src/auth.ts
+var https3 = __toESM(require("https"), 1);
+var http2 = __toESM(require("http"), 1);
+function makeRequest(method, url2, body) {
+  return new Promise((resolve, reject) => {
+    const isHttps = url2.protocol === "https:";
+    const transport = isHttps ? https3 : http2;
+    const port = url2.port || (isHttps ? 443 : 80);
+    const options = {
+      hostname: url2.hostname,
+      port,
+      path: url2.pathname + url2.search,
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        ...body ? { "Content-Length": Buffer.byteLength(body) } : {}
+      },
+      ...isHttps ? { rejectUnauthorized: true } : {},
+      timeout: 1e4
+    };
+    const req = transport.request(options, (res) => {
+      let data = "";
+      res.on("data", (chunk) => {
+        data += chunk.toString();
+      });
+      res.on("end", () => {
+        resolve({ statusCode: res.statusCode ?? 0, body: data });
+      });
+    });
+    req.on("error", reject);
+    req.on("timeout", () => {
+      req.destroy();
+      reject(new Error("timeout"));
+    });
+    if (body) {
+      req.write(body);
+    }
+    req.end();
+  });
+}
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+async function authenticateCli(config2) {
+  const serverUrl = config2.publicReporting?.serverUrl || "https://sfvibe.fun/api/burningman";
+  let sessionId;
+  let authUrl;
+  try {
+    const requestUrl = new URL(`${serverUrl}/cli-auth/request`);
+    const { statusCode, body } = await makeRequest("POST", requestUrl, "{}");
+    if (statusCode !== 200) {
+      return false;
+    }
+    const parsed = JSON.parse(body);
+    sessionId = parsed.session_id;
+    const frontendUrl = process.env.BURNINGMAN_FRONTEND_URL || serverUrl.replace("/api/burningman", "");
+    authUrl = `${frontendUrl}/burningman/auth?session=${sessionId}`;
+  } catch {
+    return false;
+  }
+  const { execFile } = await import("child_process");
+  const cmd = process.platform === "darwin" ? "open" : process.platform === "win32" ? "start" : "xdg-open";
+  try {
+    const parsed = new URL(authUrl);
+    if (parsed.protocol === "https:" || parsed.protocol === "http:") {
+      execFile(cmd, [authUrl]);
+    }
+  } catch {
+  }
+  const maxAttempts = 100;
+  const pollIntervalMs = 3e3;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    await sleep(pollIntervalMs);
+    try {
+      const statusUrl = new URL(`${serverUrl}/cli-auth/status`);
+      statusUrl.searchParams.set("session", sessionId);
+      const { statusCode, body } = await makeRequest("GET", statusUrl);
+      if (statusCode === 200) {
+        const parsed = JSON.parse(body);
+        if (parsed.status === "confirmed" && parsed.token) {
+          config2.publicReporting.cliToken = parsed.token;
+          config2.publicReporting.enabled = true;
+          writeJsonAtomic(getConfigPath(), config2);
+          return true;
+        }
+      } else if (statusCode === 404) {
+        return false;
+      }
+    } catch {
+    }
+  }
+  return false;
+}
+
+// src/setup.ts
+function ensureConfig() {
+  const configPath = getConfigPath();
+  if (fs6.existsSync(configPath)) {
+    return readJson(configPath, DEFAULT_CONFIG);
+  }
+  ensureDir(getStorageDir());
+  const config2 = { ...DEFAULT_CONFIG };
+  if (process.env.BURNINGMAN_SERVER_URL) {
+    config2.publicReporting.serverUrl = process.env.BURNINGMAN_SERVER_URL;
+  }
+  writeJsonAtomic(configPath, config2);
+  return config2;
+}
+
+// src/codex/importer.ts
+var fs7 = __toESM(require("fs"), 1);
+var os2 = __toESM(require("os"), 1);
+var path6 = __toESM(require("path"), 1);
+
+// src/utils/delta.ts
+function computeDelta(current, previous) {
+  if (previous === null) {
+    return {
+      t: current.t,
+      sid: current.sid,
+      model: current.model,
+      proj: current.proj,
+      inputDelta: current.tin,
+      outputDelta: current.tout,
+      costDelta: current.cost,
+      lineAddedDelta: current.la,
+      lineRemovedDelta: current.lr,
+      in: current.in,
+      out: current.out,
+      cr: current.cr,
+      cc: current.cc,
+      ctx: current.ctx,
+      ctxMax: current.ctxMax
+    };
+  }
+  let inputDelta = current.tin - previous.tin;
+  let outputDelta = current.tout - previous.tout;
+  let costDelta = current.cost - previous.cost;
+  let lineAddedDelta = current.la - previous.la;
+  let lineRemovedDelta = current.lr - previous.lr;
+  if (inputDelta < 0 || outputDelta < 0) {
+    inputDelta = current.tin;
+    outputDelta = current.tout;
+    costDelta = current.cost;
+    lineAddedDelta = current.la;
+    lineRemovedDelta = current.lr;
+  }
+  return {
+    t: current.t,
+    sid: current.sid,
+    model: current.model,
+    proj: current.proj,
+    inputDelta,
+    outputDelta,
+    costDelta,
+    lineAddedDelta,
+    lineRemovedDelta,
+    in: current.in,
+    out: current.out,
+    cr: current.cr,
+    cc: current.cc,
+    ctx: current.ctx,
+    ctxMax: current.ctxMax
+  };
+}
+function computeAllDeltas(entries) {
+  if (entries.length === 0) return [];
+  const deltas = [];
+  deltas.push(computeDelta(entries[0], null));
+  for (let i = 1; i < entries.length; i++) {
+    deltas.push(computeDelta(entries[i], entries[i - 1]));
+  }
+  return deltas;
+}
+
+// src/aggregator.ts
+function newBucket() {
+  return {
+    input: 0,
+    output: 0,
+    cacheRead: 0,
+    cacheCreate: 0,
+    cost: 0,
+    requests: 0,
+    linesAdded: 0,
+    linesRemoved: 0,
+    sessions: [],
+    avgContextPct: 0
+  };
+}
+function formatDateKey(timestamp) {
+  const d = new Date(timestamp);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+function getHourKey(timestamp) {
+  return String(new Date(timestamp).getHours());
+}
+function aggregateSession(sessionId, entries, startFromLine = 0) {
+  if (entries.length < 2 && startFromLine === 0) return;
+  const relevantEntries = entries.slice(Math.max(0, startFromLine));
+  if (relevantEntries.length < 2 && startFromLine === 0) return;
+  const deltaStart = startFromLine > 0 ? startFromLine - 1 : 0;
+  const deltaEntries = entries.slice(deltaStart);
+  const deltas = computeAllDeltas(deltaEntries);
+  const newDeltas = startFromLine > 0 ? deltas.slice(1) : deltas;
+  const byDate = /* @__PURE__ */ new Map();
+  for (const delta of newDeltas) {
+    const dateKey = formatDateKey(delta.t);
+    if (!byDate.has(dateKey)) byDate.set(dateKey, []);
+    byDate.get(dateKey).push(delta);
+  }
+  for (const [dateKey, dateDeltas] of byDate) {
+    const filePath = getHourlyFilePath(dateKey);
+    const hourlyData = readJson(filePath, {});
+    for (const delta of dateDeltas) {
+      const hourKey = getHourKey(delta.t);
+      const modelKey = delta.model;
+      if (!hourlyData[hourKey]) hourlyData[hourKey] = {};
+      if (!hourlyData[hourKey][modelKey]) hourlyData[hourKey][modelKey] = newBucket();
+      const bucket = hourlyData[hourKey][modelKey];
+      bucket.input += delta.inputDelta;
+      bucket.output += delta.outputDelta;
+      bucket.cacheRead += delta.cr;
+      bucket.cacheCreate += delta.cc;
+      bucket.cost += delta.costDelta;
+      bucket.requests += 1;
+      bucket.linesAdded += delta.lineAddedDelta;
+      bucket.linesRemoved += delta.lineRemovedDelta;
+      if (!bucket.sessions.includes(sessionId)) {
+        bucket.sessions.push(sessionId);
+      }
+      const prevCount = bucket.requests - 1;
+      bucket.avgContextPct = prevCount > 0 ? (bucket.avgContextPct * prevCount + delta.ctx) / bucket.requests : delta.ctx;
+    }
+    writeJsonAtomic(filePath, hourlyData);
+  }
+}
+function aggregateAllPending() {
+  const sessionFiles = listSessionFiles();
+  const meta3 = readJson(getAggregationMetaPath(), {});
+  let processed = 0;
+  let skipped = 0;
+  for (const filePath of sessionFiles) {
+    const sessionId = sessionIdFromPath(filePath);
+    const entries = readJsonl(filePath);
+    const lastProcessedLine = meta3[sessionId] ?? 0;
+    if (entries.length <= lastProcessedLine) {
+      skipped++;
+      continue;
+    }
+    aggregateSession(sessionId, entries, lastProcessedLine);
+    meta3[sessionId] = entries.length;
+    processed++;
+  }
+  writeJsonAtomic(getAggregationMetaPath(), meta3);
+  return { processed, skipped };
+}
+
+// src/codex/importer.ts
+var IMPORT_META_PATH = () => path6.join(getStorageDir(), ".codex-import-meta.json");
+function getDefaultCodexHome() {
+  return process.env.BURNINGMAN_CODEX_HOME || process.env.CODEX_HOME || path6.join(os2.homedir(), ".codex");
+}
+function listCodexSessionFiles(codexHome) {
+  const roots = [
+    path6.join(codexHome, "sessions"),
+    path6.join(codexHome, "archived_sessions")
+  ];
+  const files = [];
+  function walk(dir) {
+    if (!fs7.existsSync(dir)) return;
+    for (const name of fs7.readdirSync(dir)) {
+      const child = path6.join(dir, name);
+      const stat = fs7.statSync(child);
+      if (stat.isDirectory()) {
+        walk(child);
+      } else if (name.startsWith("rollout-") && name.endsWith(".jsonl")) {
+        files.push(child);
+      }
+    }
+  }
+  for (const root of roots) walk(root);
+  files.sort();
+  return files;
+}
+function readLines(filePath) {
+  if (!fs7.existsSync(filePath)) return [];
+  return fs7.readFileSync(filePath, "utf8").split("\n").filter((line) => line.trim().length > 0);
+}
+function asNumber(value) {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+function parseTimestamp(value) {
+  if (typeof value !== "string") return Date.now();
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : Date.now();
+}
+function projectName(cwd) {
+  return typeof cwd === "string" && cwd.length > 0 ? path6.basename(cwd) : "unknown";
+}
+function sessionIdFromRecord(record2, fallback) {
+  if (record2 && typeof record2 === "object" && "payload" in record2 && record2.payload && typeof record2.payload === "object" && "id" in record2.payload && typeof record2.payload.id === "string") {
+    return `codex-${record2.payload.id.slice(0, 12)}`;
+  }
+  return fallback;
+}
+function updateContextFromRecord(record2, context) {
+  if (record2?.type === "session_meta") {
+    context.sessionId = sessionIdFromRecord(record2, context.sessionId);
+    context.project = projectName(record2.payload?.cwd);
+    if (typeof record2.payload?.model === "string") {
+      context.model = record2.payload.model;
+    }
+  }
+  if (record2?.type === "turn_context") {
+    context.project = projectName(record2.payload?.cwd);
+    if (typeof record2.payload?.model === "string") {
+      context.model = record2.payload.model;
+    }
+  }
+}
+function quotaFromRecord(record2, timestamp) {
+  const limits = record2?.payload?.rate_limits;
+  if (!limits) return null;
+  const primary = limits.primary;
+  const secondary = limits.secondary;
+  return {
+    lastFetchedAt: timestamp,
+    five_hour: primary ? {
+      utilization: asNumber(primary.used_percent),
+      resets_at: primary.resets_at ? new Date(asNumber(primary.resets_at) * 1e3).toISOString() : ""
+    } : null,
+    seven_day: secondary ? {
+      utilization: asNumber(secondary.used_percent),
+      resets_at: secondary.resets_at ? new Date(asNumber(secondary.resets_at) * 1e3).toISOString() : ""
+    } : null
+  };
+}
+function entryFromTokenRecord(record2, context) {
+  if (record2?.type !== "event_msg" || record2?.payload?.type !== "token_count") return null;
+  const info = record2.payload.info;
+  if (!info?.total_token_usage) {
+    return null;
+  }
+  const total = info.total_token_usage;
+  const last = info.last_token_usage || {};
+  const totalTokens = asNumber(total.total_tokens);
+  if (context.lastTotalTokens === totalTokens) {
+    return null;
+  }
+  context.lastTotalTokens = totalTokens;
+  const timestamp = parseTimestamp(record2.timestamp);
+  context.latestQuota = quotaFromRecord(record2, timestamp) || context.latestQuota;
+  const contextWindow = asNumber(info.model_context_window);
+  const output = asNumber(total.output_tokens) + asNumber(total.reasoning_output_tokens);
+  const lastOutput = asNumber(last.output_tokens) + asNumber(last.reasoning_output_tokens);
+  const ctx = contextWindow > 0 ? Math.min(100, Math.round(totalTokens / contextWindow * 100)) : 0;
+  return {
+    t: timestamp,
+    sid: context.sessionId,
+    model: context.model,
+    proj: context.project,
+    in: asNumber(last.input_tokens),
+    out: lastOutput,
+    cr: asNumber(last.cached_input_tokens),
+    cc: 0,
+    tin: asNumber(total.input_tokens),
+    tout: output,
+    ctx,
+    ctxMax: contextWindow,
+    cost: 0,
+    la: 0,
+    lr: 0
+  };
+}
+function importSessionFile(filePath, startLine) {
+  const lines = readLines(filePath);
+  const safeStartLine = startLine > lines.length ? 0 : Math.max(0, startLine);
+  const fallbackId = `codex-${path6.basename(filePath, ".jsonl").slice(-12)}`;
+  const context = {
+    sessionId: fallbackId,
+    project: "unknown",
+    model: "codex",
+    lastTotalTokens: null,
+    latestQuota: null,
+    appended: 0
+  };
+  for (let index = 0; index < lines.length; index++) {
+    let record2;
+    try {
+      record2 = JSON.parse(lines[index]);
+    } catch {
+      continue;
+    }
+    updateContextFromRecord(record2, context);
+    const entry = entryFromTokenRecord(record2, context);
+    if (!entry || index < safeStartLine) continue;
+    appendJsonl(getSessionFilePath(entry.sid), entry);
+    context.appended += 1;
+  }
+  return {
+    imported: context.appended,
+    sessionId: context.appended > 0 ? context.sessionId : null,
+    lineCount: lines.length,
+    quota: context.latestQuota
+  };
+}
+function writeQuotaState(quota) {
+  if (!quota) return;
+  writeJsonAtomic(path6.join(getStorageDir(), "quota", "state.json"), quota);
+}
+async function importCodexUsage(options = {}) {
+  ensureStorageDirs();
+  const codexHome = options.codexHome || getDefaultCodexHome();
+  const meta3 = readJson(IMPORT_META_PATH(), { files: {} });
+  const files = listCodexSessionFiles(codexHome);
+  const importedSessions = /* @__PURE__ */ new Set();
+  let filesChanged = 0;
+  let entriesImported = 0;
+  let latestQuota = null;
+  for (const filePath of files) {
+    const startLine = meta3.files[filePath] ?? 0;
+    const result = importSessionFile(filePath, startLine);
+    meta3.files[filePath] = result.lineCount;
+    if (result.imported > 0) {
+      filesChanged += 1;
+      entriesImported += result.imported;
+      if (result.sessionId) importedSessions.add(result.sessionId);
+      if (result.quota) latestQuota = result.quota;
+    }
+  }
+  writeJsonAtomic(IMPORT_META_PATH(), meta3);
+  writeQuotaState(latestQuota);
+  const aggregated = aggregateAllPending();
+  let reported = false;
+  if (options.report !== false) {
+    const config2 = readJson(getConfigPath(), DEFAULT_CONFIG);
+    if (config2.publicReporting?.cliToken) {
+      reported = await submitPublicReport(config2);
+    }
+  }
+  return {
+    codexHome,
+    filesScanned: files.length,
+    filesChanged,
+    entriesImported,
+    sessionsImported: importedSessions.size,
+    aggregated,
+    reported
+  };
+}
+
 // src/mcp/tools.ts
 var SESSION_RANGE_SCHEMA = _enum(["24h", "48h", "7d"]);
 var PROJECT_RANGE_SCHEMA = _enum(["7", "30", "90"]);
@@ -24246,10 +24724,42 @@ function registerTools(server) {
       return ok ? asTextResult("Report synced successfully.", { status: "ok" }) : asTextResult("Sync failed. Check server connectivity or auth token.", { status: "error" });
     }
   );
+  server.registerTool(
+    "login_sfvibe",
+    {
+      title: "Sign in to sfvibe.fun",
+      description: "Open the sfvibe.fun browser sign-in flow and save the CLI reporting token locally."
+    },
+    async () => {
+      const config2 = ensureConfig();
+      const ok = await authenticateCli(config2);
+      return ok ? asTextResult("Signed in to sfvibe.fun. Public reporting is enabled.", { status: "ok" }) : asTextResult("Sign-in did not complete. Try again and finish the browser confirmation.", { status: "error" });
+    }
+  );
+  server.registerTool(
+    "import_codex_usage",
+    {
+      title: "Import Codex Usage",
+      description: "Import local Codex token-count events into token-burningman analytics and optionally sync sfvibe.fun reporting.",
+      inputSchema: {
+        report: boolean2().default(true).describe("Submit newly aggregated hourly data to sfvibe.fun when signed in.")
+      }
+    },
+    async ({ report }) => {
+      const result = await importCodexUsage({ report });
+      const text = [
+        `Imported ${result.entriesImported} Codex token event(s) from ${result.sessionsImported} session(s).`,
+        `Scanned ${result.filesScanned} file(s); ${result.filesChanged} had new usage.`,
+        `Aggregated ${result.aggregated.processed} session file(s), ${result.aggregated.skipped} already up to date.`,
+        result.reported ? "Synced sfvibe.fun community reporting." : "No sfvibe.fun report was submitted."
+      ].join("\n");
+      return asTextResult(text, { result });
+    }
+  );
 }
 
 // src/version.ts
-var APP_VERSION = "0.1.10";
+var APP_VERSION = "0.1.11";
 
 // src/mcp/server.ts
 async function main() {

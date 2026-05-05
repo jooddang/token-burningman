@@ -71,6 +71,22 @@ export default defineConfig([
     clean: false,
   },
   {
+    entry: { "codex-import": "src/codex-import.ts" },
+    outDir: "bin",
+    format: "cjs",
+    target: "node20",
+    platform: "node",
+    bundle: true,
+    minify: false,
+    sourcemap: false,
+    define: {
+      __APP_VERSION__: APP_VERSION,
+    },
+    noExternal: [/.*/],
+    banner: { js: "#!/usr/bin/env node" },
+    clean: false,
+  },
+  {
     entry: { mcp: "src/mcp/server.ts" },
     outDir: "bin",
     format: "cjs",

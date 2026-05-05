@@ -247,24 +247,32 @@ function normalizeQuotaUtilization(value) {
 var MODEL_NAMES = {
   "claude-opus-4-6": "Opus",
   "claude-sonnet-4-6": "Sonnet",
-  "claude-haiku-4-5-20251001": "Haiku"
+  "claude-haiku-4-5-20251001": "Haiku",
+  "gpt-5.5": "GPT-5.5",
+  "gpt-5.4": "GPT-5.4",
+  "gpt-5.3-codex": "GPT-5.3 Codex"
 };
 function modelDisplayName(modelId) {
   if (MODEL_NAMES[modelId]) return MODEL_NAMES[modelId];
   const match = modelId.match(/claude-(\w+)-/);
   if (match) return match[1].charAt(0).toUpperCase() + match[1].slice(1);
+  if (modelId.startsWith("gpt-")) return modelId.toUpperCase();
   return modelId;
 }
 var MODEL_COLORS = {
   "claude-opus-4-6": MAGENTA,
   "claude-sonnet-4-6": CYAN,
-  "claude-haiku-4-5-20251001": GREEN
+  "claude-haiku-4-5-20251001": GREEN,
+  "gpt-5.5": GREEN,
+  "gpt-5.4": CYAN,
+  "gpt-5.3-codex": GREEN
 };
 function modelColor(modelId) {
   if (MODEL_COLORS[modelId]) return MODEL_COLORS[modelId];
   if (modelId.includes("opus")) return MAGENTA;
   if (modelId.includes("sonnet")) return CYAN;
   if (modelId.includes("haiku")) return GREEN;
+  if (modelId.startsWith("gpt-")) return GREEN;
   return CYAN;
 }
 function contextColor(pct, warningPct = 75) {

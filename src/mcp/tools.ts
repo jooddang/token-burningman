@@ -14,6 +14,9 @@ import { launchTui } from "./launch-tui.js";
 import { submitPublicReport } from "../reporter.js";
 import { readJson, getConfigPath } from "../utils/storage.js";
 import { DEFAULT_CONFIG } from "../types.js";
+import { ensureConfig } from "../setup.js";
+import { authenticateCli } from "../auth.js";
+import { importCodexUsage } from "../codex/importer.js";
 
 const SESSION_RANGE_SCHEMA = z.enum(["24h", "48h", "7d"]);
 const PROJECT_RANGE_SCHEMA = z.enum(["7", "30", "90"]);
@@ -113,6 +116,42 @@ export function registerTools(server: McpServer): void {
       return ok
         ? asTextResult("Report synced successfully.", { status: "ok" })
         : asTextResult("Sync failed. Check server connectivity or auth token.", { status: "error" });
+    },
+  );
+
+  server.registerTool(
+    "login_sfvibe",
+    {
+      title: "Sign in to sfvibe.fun",
+      description: "Open the sfvibe.fun browser sign-in flow and save the CLI reporting token locally.",
+    },
+    async () => {
+      const config = ensureConfig();
+      const ok = await authenticateCli(config);
+      return ok
+        ? asTextResult("Signed in to sfvibe.fun. Public reporting is enabled.", { status: "ok" })
+        : asTextResult("Sign-in did not complete. Try again and finish the browser confirmation.", { status: "error" });
+    },
+  );
+
+  server.registerTool(
+    "import_codex_usage",
+    {
+      title: "Import Codex Usage",
+      description: "Import local Codex token-count events into token-burningman analytics and optionally sync sfvibe.fun reporting.",
+      inputSchema: {
+        report: z.boolean().default(true).describe("Submit newly aggregated hourly data to sfvibe.fun when signed in."),
+      },
+    },
+    async ({ report }) => {
+      const result = await importCodexUsage({ report });
+      const text = [
+        `Imported ${result.entriesImported} Codex token event(s) from ${result.sessionsImported} session(s).`,
+        `Scanned ${result.filesScanned} file(s); ${result.filesChanged} had new usage.`,
+        `Aggregated ${result.aggregated.processed} session file(s), ${result.aggregated.skipped} already up to date.`,
+        result.reported ? "Synced sfvibe.fun community reporting." : "No sfvibe.fun report was submitted.",
+      ].join("\n");
+      return asTextResult(text, { result });
     },
   );
 }

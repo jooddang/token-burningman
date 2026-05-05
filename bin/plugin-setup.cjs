@@ -162,6 +162,17 @@ function getPluginRootFromScript(scriptPath) {
 function escapeForJs(value) {
   return JSON.stringify(value);
 }
+function parsePluginRoot(raw) {
+  const trimmed = raw.trim();
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (typeof parsed === "string") {
+      return parsed;
+    }
+  } catch {
+  }
+  return trimmed;
+}
 function buildWrapperSource(pluginRootFilePath) {
   const encodedPath = escapeForJs(pluginRootFilePath);
   return `#!/usr/bin/env node
@@ -169,7 +180,20 @@ import { readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 
-const pluginRoot = readFileSync(${encodedPath}, "utf8").trim();
+function parsePluginRoot(raw) {
+  const trimmed = raw.trim();
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (typeof parsed === "string") {
+      return parsed;
+    }
+  } catch {
+    // Backward-compatible with plain text state files.
+  }
+  return trimmed;
+}
+
+const pluginRoot = parsePluginRoot(readFileSync(${encodedPath}, "utf8"));
 const collectorPath = join(pluginRoot, "bin", "collector.cjs");
 const result = spawnSync(process.execPath, [collectorPath], {
   stdio: "inherit",
@@ -198,7 +222,7 @@ function installHudStatusLine(pluginRoot) {
   const wrapperCommand = `node ${JSON.stringify(wrapperPath)}`;
   const wrapperSource = buildWrapperSource(pluginRootFile);
   ensureDir(path2.dirname(pluginRootFile));
-  const previousRoot = fs3.existsSync(pluginRootFile) ? JSON.parse(fs3.readFileSync(pluginRootFile, "utf8")) : "";
+  const previousRoot = fs3.existsSync(pluginRootFile) ? parsePluginRoot(fs3.readFileSync(pluginRootFile, "utf8")) : "";
   const pluginRootChanged = previousRoot !== pluginRoot;
   writeJsonAtomic(pluginRootFile, pluginRoot);
   ensureDir(path2.dirname(wrapperPath));

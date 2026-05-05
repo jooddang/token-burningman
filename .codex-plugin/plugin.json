@@ -1,0 +1,41 @@
+{
+  "name": "token-burningman",
+  "version": "0.1.11",
+  "description": "Token usage analytics for Claude Code and Codex with TUI, MCP, and opt-in sfvibe.fun community reporting.",
+  "author": {
+    "name": "jooddang",
+    "email": "gm@sfvibe.fun",
+    "url": "https://github.com/jooddang"
+  },
+  "license": "FSL-1.1-MIT",
+  "homepage": "https://github.com/jooddang/token-burningman",
+  "repository": "https://github.com/jooddang/token-burningman",
+  "keywords": [
+    "codex",
+    "claude-code",
+    "plugin",
+    "analytics",
+    "mcp",
+    "tui",
+    "usage-tracking"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.codex.mcp.json",
+  "interface": {
+    "displayName": "Token Burningman",
+    "shortDescription": "Local token analytics and sfvibe.fun community reporting for Codex.",
+    "longDescription": "Import local Codex usage events, query usage dashboards through MCP, launch a full TUI, and optionally sync anonymized hourly aggregates to sfvibe.fun.",
+    "developerName": "jooddang",
+    "category": "Productivity",
+    "capabilities": ["Interactive", "Monitoring", "Read", "Write"],
+    "websiteURL": "https://github.com/jooddang/token-burningman",
+    "privacyPolicyURL": "https://github.com/jooddang/token-burningman#privacy",
+    "termsOfServiceURL": "https://github.com/jooddang/token-burningman/blob/main/LICENSE",
+    "defaultPrompt": [
+      "Import my Codex usage",
+      "Show my token-burningman dashboard",
+      "Sign in to sfvibe.fun reporting"
+    ],
+    "brandColor": "#F59E0B"
+  }
+}

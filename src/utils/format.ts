@@ -48,6 +48,9 @@ const MODEL_NAMES: Record<string, string> = {
   "claude-opus-4-6": "Opus",
   "claude-sonnet-4-6": "Sonnet",
   "claude-haiku-4-5-20251001": "Haiku",
+  "gpt-5.5": "GPT-5.5",
+  "gpt-5.4": "GPT-5.4",
+  "gpt-5.3-codex": "GPT-5.3 Codex",
 };
 
 export function modelDisplayName(modelId: string): string {
@@ -55,6 +58,7 @@ export function modelDisplayName(modelId: string): string {
   // Fallback: extract name from model id pattern claude-{name}-{version}
   const match = modelId.match(/claude-(\w+)-/);
   if (match) return match[1].charAt(0).toUpperCase() + match[1].slice(1);
+  if (modelId.startsWith("gpt-")) return modelId.toUpperCase();
   return modelId;
 }
 
@@ -62,6 +66,9 @@ const MODEL_COLORS: Record<string, string> = {
   "claude-opus-4-6": MAGENTA,
   "claude-sonnet-4-6": CYAN,
   "claude-haiku-4-5-20251001": GREEN,
+  "gpt-5.5": GREEN,
+  "gpt-5.4": CYAN,
+  "gpt-5.3-codex": GREEN,
 };
 
 export function modelColor(modelId: string): string {
@@ -69,6 +76,7 @@ export function modelColor(modelId: string): string {
   if (modelId.includes("opus")) return MAGENTA;
   if (modelId.includes("sonnet")) return CYAN;
   if (modelId.includes("haiku")) return GREEN;
+  if (modelId.startsWith("gpt-")) return GREEN;
   return CYAN;
 }
 

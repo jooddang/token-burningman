@@ -1,6 +1,7 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { execFileSync } from "node:child_process";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { getHudWrapperPath, getPluginRootFilePath, getPluginRootFromScript, installHudStatusLine } from "../src/plugin-setup.js";
 
@@ -50,6 +51,21 @@ describe("plugin setup HUD installation", () => {
     fs.writeFileSync(path.join(binDir, "collector.cjs"), "// fake collector", "utf8");
   }
 
+  function createExecutableFakePlugin(pluginRoot: string, markerPath: string): void {
+    const binDir = path.join(pluginRoot, "bin");
+    fs.mkdirSync(binDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(binDir, "collector.cjs"),
+      [
+        "const fs = require('node:fs');",
+        "const stdin = fs.readFileSync(0, 'utf8');",
+        `fs.writeFileSync(${JSON.stringify(markerPath)}, JSON.stringify({ cwd: process.cwd(), stdin }));`,
+        "process.stdout.write('ok');",
+      ].join("\n"),
+      "utf8",
+    );
+  }
+
   it("installs the HUD wrapper when no statusLine exists", () => {
     const pluginRoot = path.join(tempHome, "plugin-v1");
     createFakePlugin(pluginRoot);
@@ -62,6 +78,7 @@ describe("plugin setup HUD installation", () => {
     // Wrapper should reference .plugin-root file, not a hardcoded collector path
     const wrapperContent = fs.readFileSync(wrapperPath, "utf8");
     expect(wrapperContent).toContain(".plugin-root");
+    expect(wrapperContent).toContain("JSON.parse");
     expect(wrapperContent).not.toContain(path.join(pluginRoot, "bin", "collector.cjs"));
     // .plugin-root should contain the pluginRoot
     expect(JSON.parse(fs.readFileSync(pluginRootFile, "utf8"))).toBe(pluginRoot);
@@ -122,6 +139,40 @@ describe("plugin setup HUD installation", () => {
     expect(wrapperContent).not.toContain(oldRoot);
     expect(wrapperContent).not.toContain(newRoot);
     expect(wrapperContent).toContain(".plugin-root");
+  });
+
+  it("installed wrapper can launch collector after .plugin-root JSON update", () => {
+    const oldRoot = path.join(tempHome, "plugin-0.1.5");
+    const newRoot = path.join(tempHome, "plugin-0.1.7");
+    const markerPath = path.join(tempHome, "collector-marker.json");
+    createFakePlugin(oldRoot);
+    createExecutableFakePlugin(newRoot, markerPath);
+
+    installHudStatusLine(oldRoot);
+    installHudStatusLine(newRoot);
+
+    const output = execFileSync("node", [getHudWrapperPath()], {
+      input: "{\"session_id\":\"abc\"}",
+      encoding: "utf8",
+    });
+
+    expect(output).toBe("ok");
+    const marker = JSON.parse(fs.readFileSync(markerPath, "utf8")) as { stdin: string };
+    expect(marker.stdin).toBe("{\"session_id\":\"abc\"}");
+  });
+
+  it("accepts legacy plain-text .plugin-root files during upgrade", () => {
+    const oldRoot = path.join(tempHome, "plugin-plain-root");
+    const newRoot = path.join(tempHome, "plugin-json-root");
+    createFakePlugin(oldRoot);
+    createFakePlugin(newRoot);
+
+    installHudStatusLine(oldRoot);
+    fs.writeFileSync(getPluginRootFilePath(), oldRoot, "utf8");
+
+    const result = installHudStatusLine(newRoot);
+    expect(result.status).toBe("wrapper-updated");
+    expect(JSON.parse(fs.readFileSync(getPluginRootFilePath(), "utf8"))).toBe(newRoot);
   });
 
   it("returns already-configured when nothing changed", () => {

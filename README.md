@@ -9,7 +9,7 @@
   <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg" alt="Node.js" /></a>
 </p>
 
-<p align="center">Token usage analytics for <a href="https://claude.ai/claude-code">Claude Code</a>. Local-first. Privacy-safe.</p>
+<p align="center">Token usage analytics for <a href="https://claude.ai/claude-code">Claude Code</a> and Codex. Local-first. Privacy-safe.</p>
 
 <p align="center">
   <img src="images/ss3.png" width="720" alt="token-burningman overview dashboard" />
@@ -20,18 +20,20 @@
 - **Local analytics** — Per-session, per-project, per-model token counts, costs, and trends. Zero network dependency.
 - **TUI dashboard** — 5 interactive views: Overview, Projects, Sessions, Trends, Community.
 - **Statusline integration** — Real-time token/cost display in your Claude Code status bar (`full`, `compact`, `minimal`, or `off`).
-- **MCP server** — Query usage data programmatically from Claude Code with 6 tools, 4 resources, and 2 prompts.
+- **Codex import** — Import local Codex token-count events into the same analytics and reporting pipeline.
+- **MCP server** — Query usage data programmatically from Claude Code or Codex with tools, resources, and prompts.
 - **Data export** — Export session or hourly data as JSON or CSV.
 - **Community reporting** (opt-in) — Share anonymized hourly aggregates to a public dashboard at [sfvibe.fun](https://sfvibe.fun). Only hourly bucketed totals are shared — no project names, file contents, or session IDs.
 
 ## Prerequisites
 
 - **Node.js 20+**
-- **Claude Code** (for plugin/statusline features; the TUI works standalone)
+- **Claude Code** (for Claude plugin/statusline features; the TUI works standalone)
+- **Codex CLI/App** (for Codex plugin/MCP features)
 
 ## Installation
 
-### Claude Code plugin (recommended)
+### Claude Code plugin
 
 ```bash
 # Add the marketplace
@@ -41,9 +43,35 @@ claude plugin marketplace add jooddang/token-burningman
 claude plugin install token-burningman@jooddang
 ```
 
-This registers the MCP server, session hooks, and slash commands automatically, and it will configure the HUD statusline for you when no different statusline command is already present.
+You can run the same commands inside Claude Code as slash commands:
 
-### From source
+```text
+/plugin marketplace add jooddang/token-burningman
+/plugin install token-burningman@jooddang
+```
+
+This registers the MCP server, session hooks, slash commands, and skills automatically. During setup, token-burningman installs a stable HUD wrapper at `~/.token-burningman/bin/statusline.mjs` and points Claude Code's `statusLine` command at that wrapper when no different statusline command is already present.
+
+#### Claude Code updates
+
+```bash
+# Refresh marketplace metadata
+claude plugin marketplace update jooddang
+
+# Update the installed plugin
+claude plugin update token-burningman@jooddang
+```
+
+Restart Claude Code after an update, or run `/reload-plugins` if Claude Code prompts you to reload. The HUD wrapper is intentionally stable across plugin versions: updates only rewrite `~/.token-burningman/.plugin-root` so the wrapper launches the newest installed `bin/collector.cjs`.
+
+If the HUD disappears after an update:
+
+1. Run `claude plugin marketplace update jooddang`.
+2. Run `claude plugin update token-burningman@jooddang`.
+3. Restart Claude Code or run `/reload-plugins`.
+4. Check `~/.claude/settings.json`; `statusLine.command` should point to `node "~/.token-burningman/bin/statusline.mjs"` unless you intentionally use another statusline wrapper.
+
+#### Claude Code from source
 
 ```bash
 git clone https://github.com/jooddang/token-burningman.git
@@ -51,8 +79,60 @@ cd token-burningman
 npm install
 npm run build
 
-# Install as a local plugin
-claude plugin add .
+# Add this checkout as a local marketplace and install from it
+claude plugin marketplace add .
+claude plugin install token-burningman@jooddang
+```
+
+For local update testing, rebuild first, then update/re-add the local plugin and restart Claude Code:
+
+```bash
+npm run build
+claude plugin marketplace update jooddang
+claude plugin update token-burningman@jooddang
+```
+
+### Codex plugin
+
+```bash
+# Add the marketplace
+codex plugin marketplace add jooddang/token-burningman
+```
+
+Then open Codex, run `/plugins`, choose **Token Burningman**, and install it from the marketplace. This registers the MCP server and Codex skills. Codex CLI currently manages marketplaces from the shell, while plugin installation is done through the `/plugins` UI.
+
+Codex does not currently expose a Claude-style plugin statusline hook, so token-burningman imports Codex usage from local Codex session logs when you ask for fresh analytics. The Codex skill calls `import_codex_usage`, then the normal dashboard tools read the shared token-burningman store.
+
+#### Codex updates
+
+```bash
+codex plugin marketplace upgrade token-burningman
+```
+
+After upgrading the marketplace, open `/plugins` in Codex and make sure **Token Burningman** is installed/enabled. If Codex still shows old behavior, restart Codex so the MCP server and skills are reloaded.
+
+#### Codex from source
+
+This repo includes `.agents/plugins/marketplace.json` for local development. From this checkout, add the local marketplace root to Codex:
+
+```bash
+codex plugin marketplace add .
+```
+
+Then install **Token Burningman** from `/plugins`. For local updates, run `npm run build`, then refresh the marketplace and restart Codex:
+
+```bash
+npm run build
+codex plugin marketplace upgrade token-burningman
+```
+
+### Standalone npm tools
+
+```bash
+npm install -g token-burningman
+burningman                    # TUI dashboard
+burningman-statusline         # Claude-compatible statusline command
+burningman-codex-import       # Import local Codex usage into token-burningman
 ```
 
 ## Usage
@@ -105,7 +185,7 @@ If you already use another statusline command, token-burningman will not overwri
 
 ### MCP Tools
 
-When installed as a Claude Code plugin (or MCP server), the following tools are available:
+When installed as a Claude Code or Codex plugin (or MCP server), the following tools are available:
 
 | Tool | Description |
 |------|-------------|
@@ -115,6 +195,8 @@ When installed as a Claude Code plugin (or MCP server), the following tools are 
 | `get_trends` | Daily cost, cache rate, and productivity trends (`7`, `30`, `90` days) |
 | `launch_tui` | Open the full TUI in tmux or a new terminal window |
 | `sync_report` | Manually submit unreported hourly data to the community server |
+| `login_sfvibe` | Sign in through sfvibe.fun and save the local CLI reporting token |
+| `import_codex_usage` | Import local Codex usage events, aggregate them, and optionally sync reporting |
 
 **MCP Resources** (read-only data endpoints):
 
@@ -143,7 +225,7 @@ Export session or hourly data as JSON or CSV via the `/export` slash command in 
   <img src="images/ss5.png" width="720" alt="Community dashboard" />
 </p>
 
-Sign in via the **Community** tab in the TUI (press `5`, then `s`). After authentication, hourly aggregates are submitted automatically.
+Sign in via the **Community** tab in the TUI (press `5`, then `s`) or ask Codex to sign in to sfvibe.fun, which calls the `login_sfvibe` MCP tool. After authentication, hourly aggregates are submitted automatically when maintenance or Codex import runs.
 
 <p align="center">
   <img src="images/burningman social board.png" width="720" alt="SFvibe.fun community social board" />
@@ -211,9 +293,13 @@ All settings are stored in `~/.token-burningman/config.json`. The full default c
 
 repo root/
 ├── .claude-plugin/               # Plugin + marketplace manifests
-├── .mcp.json                     # MCP server wiring
+├── .codex-plugin/                # Codex plugin manifest
+├── .agents/plugins/              # Codex marketplace metadata
+├── .mcp.json                     # Claude MCP server wiring
+├── .codex.mcp.json               # Codex MCP server wiring
 ├── src/
 │   ├── collector.ts              # Statusline data collector (<50ms)
+│   ├── codex/                    # Codex usage import
 │   ├── aggregator.ts             # Session → hourly aggregation
 │   ├── maintenance.ts            # Hourly maintenance tasks
 │   ├── reporter.ts               # Community report submission

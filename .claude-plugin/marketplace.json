@@ -1,7 +1,5 @@
 {
-  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "jooddang",
-  "description": "Claude Code usage analytics plugin with local-first collection, native MCP dashboards, and a full Ink TUI.",
   "owner": {
     "name": "jooddang",
     "email": "gm@sfvibe.fun"
@@ -9,8 +7,8 @@
   "plugins": [
     {
       "name": "token-burningman",
-      "description": "Track Claude Code usage with statusline collection, hourly aggregation, native MCP summaries, and a full TUI dashboard.",
-      "version": "0.1.7",
+      "description": "Track Claude Code and Codex usage with local collection, hourly aggregation, native MCP summaries, and a full TUI dashboard.",
+      "version": "0.1.11",
       "author": {
         "name": "jooddang",
         "email": "gm@sfvibe.fun"
@@ -22,6 +20,7 @@
       "license": "FSL-1.1-MIT",
       "keywords": [
         "claude-code",
+        "codex",
         "analytics",
         "statusline",
         "mcp",
@@ -34,5 +33,8 @@
       ]
     }
   ],
-  "version": "0.1.7"
+  "metadata": {
+    "version": "0.1.11",
+    "description": "Claude Code and Codex usage analytics plugin with local-first collection, native MCP dashboards, and a full Ink TUI."
+  }
 }

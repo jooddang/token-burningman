@@ -49,6 +49,19 @@ function escapeForJs(value: string): string {
   return JSON.stringify(value);
 }
 
+function parsePluginRoot(raw: string): string {
+  const trimmed = raw.trim();
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (typeof parsed === "string") {
+      return parsed;
+    }
+  } catch {
+    // Older wrappers may have written a plain text path.
+  }
+  return trimmed;
+}
+
 function buildWrapperSource(pluginRootFilePath: string): string {
   const encodedPath = escapeForJs(pluginRootFilePath);
   return `#!/usr/bin/env node
@@ -56,7 +69,20 @@ import { readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 
-const pluginRoot = readFileSync(${encodedPath}, "utf8").trim();
+function parsePluginRoot(raw) {
+  const trimmed = raw.trim();
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (typeof parsed === "string") {
+      return parsed;
+    }
+  } catch {
+    // Backward-compatible with plain text state files.
+  }
+  return trimmed;
+}
+
+const pluginRoot = parsePluginRoot(readFileSync(${encodedPath}, "utf8"));
 const collectorPath = join(pluginRoot, "bin", "collector.cjs");
 const result = spawnSync(process.execPath, [collectorPath], {
   stdio: "inherit",
@@ -91,7 +117,7 @@ export function installHudStatusLine(pluginRoot: string): SetupResult {
   // Check if pluginRoot changed from previous install
   ensureDir(path.dirname(pluginRootFile));
   const previousRoot = fs.existsSync(pluginRootFile)
-    ? JSON.parse(fs.readFileSync(pluginRootFile, "utf8")) as string
+    ? parsePluginRoot(fs.readFileSync(pluginRootFile, "utf8"))
     : "";
   const pluginRootChanged = previousRoot !== pluginRoot;
   writeJsonAtomic(pluginRootFile, pluginRoot);

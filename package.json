@@ -1,20 +1,25 @@
 {
   "name": "token-burningman",
-  "version": "0.1.10",
-  "description": "Token usage analytics for Claude Code with TUI, statusline, MCP, and opt-in community reporting. Local-first. Privacy-safe.",
+  "version": "0.1.11",
+  "description": "Token usage analytics for Claude Code and Codex with TUI, statusline, MCP, and opt-in community reporting. Local-first. Privacy-safe.",
   "type": "module",
   "bin": {
     "burningman": "./bin/tui.js",
     "token-burningman": "./bin/tui.js",
     "burningman-statusline": "./bin/collector.cjs",
-    "token-burningman-statusline": "./bin/collector.cjs"
+    "token-burningman-statusline": "./bin/collector.cjs",
+    "burningman-codex-import": "./bin/codex-import.cjs",
+    "token-burningman-codex-import": "./bin/codex-import.cjs"
   },
   "files": [
     "bin/",
     "commands/",
     "hooks/",
     "skills/",
+    ".agents/",
     ".claude-plugin/",
+    ".codex-plugin/",
+    ".codex.mcp.json",
     ".mcp.json"
   ],
   "scripts": {
@@ -56,6 +61,7 @@
   },
   "keywords": [
     "claude-code",
+    "codex",
     "plugin",
     "statusline",
     "mcp",

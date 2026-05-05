@@ -1,7 +1,7 @@
 {
   "name": "token-burningman",
-  "version": "0.1.8",
-  "description": "Token usage analytics for Claude Code with TUI, statusline, MCP, and opt-in community reporting. Local-first. Privacy-safe.",
+  "version": "0.1.11",
+  "description": "Token usage analytics for Claude Code and Codex with TUI, statusline, MCP, and opt-in community reporting. Local-first. Privacy-safe.",
   "author": {
     "name": "jooddang",
     "email": "gm@sfvibe.fun",
@@ -12,6 +12,7 @@
   "repository": "https://github.com/jooddang/token-burningman",
   "keywords": [
     "claude-code",
+    "codex",
     "plugin",
     "analytics",
     "statusline",
@@ -21,23 +22,16 @@
   "commands": "./commands/",
   "skills": "./skills/",
   "mcpServers": "./.mcp.json",
-  "interface": {
-    "displayName": "Token Burningman",
-    "shortDescription": "Claude Code usage analytics with native summaries and full TUI drill-down.",
-    "longDescription": "Track Claude Code token usage locally, view native dashboards through MCP, keep a full Ink TUI for deep inspection, and optionally submit anonymized hourly community reports.",
-    "developerName": "jooddang",
-    "category": "productivity",
-    "capabilities": ["Interactive", "Monitoring", "Write"],
-    "websiteURL": "https://github.com/jooddang/token-burningman",
-    "privacyPolicyURL": "https://github.com/jooddang/token-burningman#privacy",
-    "termsOfServiceURL": "https://github.com/jooddang/token-burningman/blob/main/LICENSE",
-    "defaultPrompt": [
-      "Summarize my Claude Code usage today.",
-      "Show the projects that cost me the most this month.",
-      "Open the full token-burningman dashboard."
-    ],
-    "brandColor": "#F59E0B"
-  },
-  "postInstall": "npm install && npm run build",
-  "setup": "node bin/plugin-setup.cjs"
+  "hooks": {
+    "Setup": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PLUGIN_ROOT/bin/plugin-setup.cjs\""
+          }
+        ]
+      }
+    ]
+  }
 }
