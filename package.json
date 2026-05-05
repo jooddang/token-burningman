@@ -16,6 +16,7 @@
     "commands/",
     "hooks/",
     "skills/",
+    "plugins/",
     ".agents/",
     ".claude-plugin/",
     ".codex-plugin/",
@@ -23,7 +24,7 @@
     ".mcp.json"
   ],
   "scripts": {
-    "build": "node -e \"require('node:fs').rmSync('bin', { recursive: true, force: true })\" && tsup",
+    "build": "node -e \"require('node:fs').rmSync('bin', { recursive: true, force: true })\" && tsup && node scripts/sync-codex-plugin.cjs",
     "dev": "tsup --watch",
     "test": "vitest run"
   },

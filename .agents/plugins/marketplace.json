@@ -8,7 +8,7 @@
       "name": "token-burningman",
       "source": {
         "source": "local",
-        "path": "./"
+        "path": "./plugins/token-burningman"
       },
       "policy": {
         "installation": "AVAILABLE",
