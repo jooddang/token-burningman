@@ -1,6 +1,6 @@
 {
   "name": "token-burningman",
-  "version": "0.1.11",
+  "version": "0.1.12",
   "description": "Token usage analytics for Claude Code and Codex with TUI, MCP, and opt-in sfvibe.fun community reporting.",
   "author": {
     "name": "jooddang",
@@ -27,7 +27,12 @@
     "longDescription": "Import local Codex usage events, query usage dashboards through MCP, launch a full TUI, and optionally sync anonymized hourly aggregates to sfvibe.fun.",
     "developerName": "jooddang",
     "category": "Productivity",
-    "capabilities": ["Interactive", "Monitoring", "Read", "Write"],
+    "capabilities": [
+      "Interactive",
+      "Monitoring",
+      "Read",
+      "Write"
+    ],
     "websiteURL": "https://github.com/jooddang/token-burningman",
     "privacyPolicyURL": "https://github.com/jooddang/token-burningman#privacy",
     "termsOfServiceURL": "https://github.com/jooddang/token-burningman/blob/main/LICENSE",
