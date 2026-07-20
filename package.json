@@ -3,6 +3,7 @@
   "version": "0.1.12",
   "description": "Token usage analytics for Claude Code and Codex with TUI, statusline, MCP, and opt-in community reporting. Local-first. Privacy-safe.",
   "type": "module",
+  "packageManager": "pnpm@11.13.1",
   "bin": {
     "burningman": "./bin/tui.js",
     "token-burningman": "./bin/tui.js",
