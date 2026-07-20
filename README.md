@@ -50,7 +50,7 @@ You can run the same commands inside Claude Code as slash commands:
 /plugin install token-burningman@jooddang
 ```
 
-This registers the MCP server, session hooks, slash commands, and skills automatically. During setup, token-burningman installs a stable HUD wrapper at `~/.token-burningman/bin/statusline.mjs` and points Claude Code's `statusLine` command at that wrapper when no different statusline command is already present.
+This registers the MCP server, session hooks, slash commands, and skills automatically. During setup, token-burningman copies its statusline collector into Claude Code's persistent plugin data directory (`~/.claude/plugins/data/token-burningman-<marketplace>/bin/`) and points Claude Code's `statusLine` command at `collector.cjs` there when no different statusline command is already present.
 
 #### Claude Code updates
 
@@ -62,14 +62,14 @@ claude plugin marketplace update jooddang
 claude plugin update token-burningman@jooddang
 ```
 
-Restart Claude Code after an update, or run `/reload-plugins` if Claude Code prompts you to reload. The HUD wrapper is intentionally stable across plugin versions: updates only rewrite `~/.token-burningman/.plugin-root` so the wrapper launches the newest installed `bin/collector.cjs`.
+Restart Claude Code after an update, or run `/reload-plugins` if Claude Code prompts you to reload. The statusline path is intentionally stable across plugin versions: on every session start the plugin re-syncs the latest `collector.cjs` into the persistent data directory, so the `statusLine` command never references a versioned plugin cache path.
 
 If the HUD disappears after an update:
 
 1. Run `claude plugin marketplace update jooddang`.
 2. Run `claude plugin update token-burningman@jooddang`.
 3. Restart Claude Code or run `/reload-plugins`.
-4. Check `~/.claude/settings.json`; `statusLine.command` should point to `node "~/.token-burningman/bin/statusline.mjs"` unless you intentionally use another statusline wrapper.
+4. Check `~/.claude/settings.json`; `statusLine.command` should point to `node "~/.claude/plugins/data/token-burningman-<marketplace>/bin/collector.cjs"` (or `~/.token-burningman/bin/collector.cjs` for manual installs) unless you intentionally use another statusline command.
 
 #### Claude Code from source
 
@@ -164,7 +164,7 @@ node bin/tui.js         # from source
 
 ### Statusline
 
-When installed as a Claude Code plugin, setup now installs a stable HUD wrapper at `~/.token-burningman/bin/statusline.mjs` and points Claude Code's `statusLine` command at it if you do not already have a different statusline configured. Configure the format in `~/.token-burningman/config.json`:
+When installed as a Claude Code plugin, setup copies the collector to a version-independent path and points Claude Code's `statusLine` command at it if you do not already have a different statusline configured. Configure the format in `~/.token-burningman/config.json`:
 
 ```jsonc
 "display": {
@@ -172,7 +172,7 @@ When installed as a Claude Code plugin, setup now installs a stable HUD wrapper 
 }
 ```
 
-If you already use another statusline command, token-burningman will not overwrite it. In that case, point your existing wrapper at `~/.token-burningman/bin/statusline.mjs`, or if you installed from npm globally use:
+If you already use another statusline command, token-burningman chains it automatically: your existing statusline renders on the first line and the token-burningman HUD on the second. Set `display.chainStatusline` to `false` in `~/.token-burningman/config.json` to keep your statusline untouched instead. If you installed from npm globally use:
 
 ```json
 {
@@ -264,7 +264,6 @@ All settings are stored in `~/.token-burningman/config.json`. The full default c
   },
   "collection": {
     "enabled": true,
-    "quotaPollingIntervalMin": 60,                 // how often to check API quota
     "hourlyMaintenanceIntervalMin": 60,
     "sessionRetentionDays": 90,                    // auto-cleanup old sessions
     "archiveAfterDays": 30

@@ -7,7 +7,7 @@ import {
 } from "./chunk-OF2HD2D5.js";
 import {
   DEFAULT_CONFIG
-} from "./chunk-GBNYSLYD.js";
+} from "./chunk-4O3443IP.js";
 import {
   ensureStorageDirs,
   getConfigPath,
@@ -27459,7 +27459,7 @@ var styles_default = styles2;
 // node_modules/.pnpm/ink@5.2.1_@types+react@18.3.28_react-devtools-core@4.28.5_react@18.3.1/node_modules/ink/build/reconciler.js
 if (process3.env["DEV"] === "true") {
   try {
-    await import("./devtools-F7KKFLFI.js");
+    await import("./devtools-GSOYYIBH.js");
   } catch (error) {
     if (error.code === "ERR_MODULE_NOT_FOUND") {
       console.warn(`
@@ -30201,12 +30201,11 @@ function fmtDuration(ms) {
 function fmtLines(added, removed) {
   return `+${added}/-${removed}`;
 }
-function normalizeQuotaUtilization(value) {
-  if (typeof value !== "number") return null;
-  return Math.round(value > 1 ? value : value * 100);
-}
 var MODEL_NAMES = {
+  "claude-fable-5": "Fable",
+  "claude-opus-4-8": "Opus",
   "claude-opus-4-6": "Opus",
+  "claude-sonnet-5": "Sonnet",
   "claude-sonnet-4-6": "Sonnet",
   "claude-haiku-4-5-20251001": "Haiku",
   "gpt-5.5": "GPT-5.5",
@@ -30227,10 +30226,7 @@ function cacheHitRate(cacheRead, inputTokens) {
 }
 
 // src/quota.ts
-import * as fs2 from "fs";
 import * as path from "path";
-import * as https from "https";
-import { execFileSync } from "child_process";
 var QUOTA_STATE_PATH = () => path.join(getStorageDir(), "quota", "state.json");
 var DEFAULT_QUOTA_STATE = {
   lastFetchedAt: 0,
@@ -30242,7 +30238,7 @@ function readQuotaState() {
 }
 
 // src/analytics.ts
-import * as fs3 from "fs";
+import * as fs2 from "fs";
 import * as path2 from "path";
 function getProjectStats(rangeDays) {
   const cutoff = Date.now() - rangeDays * 24 * 60 * 60 * 1e3;
@@ -30291,7 +30287,7 @@ function getProjectStats(rangeDays) {
     );
     const modelMix = {};
     for (const [model, tokens] of p.modelTokens) {
-      const shortName = model.includes("opus") ? "Opus" : model.includes("sonnet") ? "Sonnet" : model.includes("haiku") ? "Haiku" : model;
+      const shortName = model.includes("fable") ? "Fable" : model.includes("opus") ? "Opus" : model.includes("sonnet") ? "Sonnet" : model.includes("haiku") ? "Haiku" : model;
       modelMix[shortName] = totalModelTokens > 0 ? Math.round(tokens / totalModelTokens * 100) : 0;
     }
     const totalIn = p.cacheRead + p.inputTokens;
@@ -30310,8 +30306,8 @@ function getProjectStats(rangeDays) {
 }
 function getDailyStats(rangeDays) {
   const hourlyDir = getHourlyDir();
-  if (!fs3.existsSync(hourlyDir)) return [];
-  const files = fs3.readdirSync(hourlyDir).filter((f) => f.endsWith(".json"));
+  if (!fs2.existsSync(hourlyDir)) return [];
+  const files = fs2.readdirSync(hourlyDir).filter((f) => f.endsWith(".json"));
   const cutoffDate = /* @__PURE__ */ new Date();
   cutoffDate.setDate(cutoffDate.getDate() - rangeDays);
   const cutoffStr = cutoffDate.toISOString().slice(0, 10);
@@ -30362,8 +30358,8 @@ function getCacheRateTrend(rangeDays) {
 }
 function getWeeklyHeatmap(rangeDays) {
   const hourlyDir = getHourlyDir();
-  if (!fs3.existsSync(hourlyDir)) return [];
-  const files = fs3.readdirSync(hourlyDir).filter((f) => f.endsWith(".json"));
+  if (!fs2.existsSync(hourlyDir)) return [];
+  const files = fs2.readdirSync(hourlyDir).filter((f) => f.endsWith(".json"));
   const cutoffDate = /* @__PURE__ */ new Date();
   cutoffDate.setDate(cutoffDate.getDate() - rangeDays);
   const cutoffStr = cutoffDate.toISOString().slice(0, 10);
@@ -30408,14 +30404,18 @@ function cached(key, fn) {
   cache3.set(key, { data, ts: Date.now() });
   return data;
 }
+function roundUtilization(value) {
+  if (typeof value !== "number") return null;
+  return Math.round(value);
+}
 function summarizeQuota(quota) {
   if (!quota || !quota.five_hour && !quota.seven_day) {
     return null;
   }
   return {
-    fiveHourPct: normalizeQuotaUtilization(quota.five_hour?.utilization),
+    fiveHourPct: roundUtilization(quota.five_hour?.utilization),
     fiveHourResetsAt: quota.five_hour?.resets_at ?? null,
-    sevenDayPct: normalizeQuotaUtilization(quota.seven_day?.utilization),
+    sevenDayPct: roundUtilization(quota.seven_day?.utilization),
     sevenDayResetsAt: quota.seven_day?.resets_at ?? null
   };
 }
@@ -31205,7 +31205,7 @@ function CommunityView() {
         if (input === "s" && (authState === "unauthenticated" || authState === "error")) {
           setAuthState("authenticating");
           setAuthMessage("Opening browser...");
-          import("./setup-47TEJ4GT.js").then(({ ensureConfig }) => {
+          import("./setup-THLY4GVA.js").then(({ ensureConfig }) => {
             const freshConfig = ensureConfig();
             return authenticateCli(freshConfig);
           }).then((ok) => {
@@ -31227,7 +31227,7 @@ function CommunityView() {
         }
         if (input === "o" && authState === "authenticated") {
           import("./storage-KCM6WV3Y.js").then(({ getConfigPath: getConfigPath2, readJson: readJson2, writeJsonAtomic: writeJsonAtomic2 }) => {
-            import("./types-GH667CEZ.js").then(({ DEFAULT_CONFIG: DEFAULT_CONFIG2 }) => {
+            import("./types-S3LSUVNE.js").then(({ DEFAULT_CONFIG: DEFAULT_CONFIG2 }) => {
               const cfg = readJson2(getConfigPath2(), DEFAULT_CONFIG2);
               cfg.publicReporting.cliToken = null;
               cfg.publicReporting.enabled = false;

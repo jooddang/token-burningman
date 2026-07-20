@@ -6,6 +6,10 @@ var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
 var __copyProps = (to, from, except, desc) => {
   if (from && typeof from === "object" || typeof from === "function") {
     for (let key of __getOwnPropNames(from))
@@ -22,9 +26,17 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
   mod
 ));
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
 // src/collector.ts
-var fs5 = __toESM(require("fs"), 1);
+var collector_exports = {};
+__export(collector_exports, {
+  extractEntry: () => extractEntry,
+  formatStatusline: () => formatStatusline,
+  schemaDriftWarning: () => schemaDriftWarning
+});
+module.exports = __toCommonJS(collector_exports);
+var fs4 = __toESM(require("fs"), 1);
 var path5 = __toESM(require("path"), 1);
 
 // src/types.ts
@@ -39,13 +51,11 @@ var DEFAULT_CONFIG = {
     statuslineFormat: "full",
     currency: "USD",
     timezone: "system",
-    colorScheme: "auto"
+    colorScheme: "auto",
+    chainStatusline: true
   },
   collection: {
     enabled: true,
-    quotaPollingIntervalMin: 1,
-    quotaPollingMinSec: 30,
-    quotaPollingTokenDelta: 2e4,
     hourlyMaintenanceIntervalMin: 60,
     sessionRetentionDays: 90,
     archiveAfterDays: 30
@@ -128,73 +138,53 @@ function writeJsonAtomic(filePath, data) {
 var DEFAULT_LOCK_STALE_MS = 15 * 6e4;
 
 // src/quota.ts
-var fs2 = __toESM(require("fs"), 1);
 var path2 = __toESM(require("path"), 1);
-var https = __toESM(require("https"), 1);
-var import_node_child_process = require("child_process");
 var QUOTA_STATE_PATH = () => path2.join(getStorageDir(), "quota", "state.json");
-var QUOTA_TRIGGER_PATH = () => path2.join(getStorageDir(), "quota", "trigger.json");
+var QUOTA_HISTORY_PATH = () => path2.join(getStorageDir(), "quota", "history.jsonl");
 var DEFAULT_QUOTA_STATE = {
   lastFetchedAt: 0,
   five_hour: null,
   seven_day: null
 };
-var DEFAULT_QUOTA_TRIGGER = {
-  lastTriggerAt: 0,
-  tokensAtLastTrigger: 0,
-  sid: ""
-};
+var QUOTA_REFRESH_MS = 6e4;
 function readQuotaState() {
   return readJson(QUOTA_STATE_PATH(), DEFAULT_QUOTA_STATE);
 }
-function readQuotaTrigger() {
-  return readJson(QUOTA_TRIGGER_PATH(), DEFAULT_QUOTA_TRIGGER);
+function toIsoTimestamp(epochSeconds) {
+  if (!Number.isFinite(epochSeconds)) return "";
+  return new Date(epochSeconds * 1e3).toISOString();
 }
-function markQuotaFetchTriggered(tokens, sid) {
-  writeJsonAtomic(QUOTA_TRIGGER_PATH(), {
-    lastTriggerAt: Date.now(),
-    tokensAtLastTrigger: tokens,
-    sid
-  });
-}
-function shouldFetchQuota(config, currentTokens = 0, sid = "") {
-  const state = readQuotaState();
-  const trigger = readQuotaTrigger();
-  const now = Date.now();
-  const lastActivityAt = Math.max(state.lastFetchedAt, trigger.lastTriggerAt);
-  const elapsed = now - lastActivityAt;
-  const minMs = (config.collection?.quotaPollingMinSec ?? 30) * 1e3;
-  const intervalMs = (config.collection?.quotaPollingIntervalMin ?? 1) * 6e4;
-  if (elapsed < minMs) return false;
-  if (elapsed >= intervalMs) return true;
-  if (sid && trigger.sid && sid !== trigger.sid) return true;
-  const threshold = config.collection?.quotaPollingTokenDelta ?? 2e4;
-  const delta = currentTokens - trigger.tokensAtLastTrigger;
-  return delta >= threshold;
-}
-function triggerQuotaFetchBackground(binDir) {
-  const script = path2.join(binDir, "fetch-quota-bg.cjs");
-  if (!fs2.existsSync(script)) return;
-  try {
-    const { spawn: spawn2 } = require("child_process");
-    const child = spawn2("node", [script], {
-      detached: true,
-      stdio: "ignore"
+function updateQuotaStateFromStatusline(rateLimits) {
+  const fiveHour = rateLimits?.five_hour ?? null;
+  const sevenDay = rateLimits?.seven_day ?? null;
+  if (!fiveHour && !sevenDay) return;
+  const previous = readQuotaState();
+  const next = {
+    lastFetchedAt: Date.now(),
+    five_hour: fiveHour ? { utilization: fiveHour.used_percentage, resets_at: toIsoTimestamp(fiveHour.resets_at) } : previous.five_hour,
+    seven_day: sevenDay ? { utilization: sevenDay.used_percentage, resets_at: toIsoTimestamp(sevenDay.resets_at) } : previous.seven_day
+  };
+  const unchanged = previous.five_hour?.utilization === next.five_hour?.utilization && previous.seven_day?.utilization === next.seven_day?.utilization;
+  if (unchanged && Date.now() - previous.lastFetchedAt < QUOTA_REFRESH_MS) return;
+  writeJsonAtomic(QUOTA_STATE_PATH(), next);
+  if (!unchanged) {
+    appendJsonl(QUOTA_HISTORY_PATH(), {
+      t: Date.now(),
+      five_hour: next.five_hour?.utilization ?? null,
+      seven_day: next.seven_day?.utilization ?? null
     });
-    child.unref();
-  } catch {
   }
 }
 
 // src/maintenance.ts
-var fs4 = __toESM(require("fs"), 1);
+var fs3 = __toESM(require("fs"), 1);
 var path4 = __toESM(require("path"), 1);
-var import_node_child_process2 = require("child_process");
+var import_node_child_process = require("child_process");
 
 // src/reporter.ts
-var https2 = __toESM(require("https"), 1);
+var https = __toESM(require("https"), 1);
 var http = __toESM(require("http"), 1);
-var fs3 = __toESM(require("fs"), 1);
+var fs2 = __toESM(require("fs"), 1);
 var path3 = __toESM(require("path"), 1);
 
 // src/maintenance.ts
@@ -211,9 +201,9 @@ function shouldRunHourlyMaintenance(config) {
 }
 function triggerHourlyMaintenanceBackground(binDir) {
   const script = path4.join(binDir, "hourly-maintenance-bg.cjs");
-  if (!fs4.existsSync(script)) return;
+  if (!fs3.existsSync(script)) return;
   try {
-    const child = (0, import_node_child_process2.spawn)("node", [script], {
+    const child = (0, import_node_child_process.spawn)("node", [script], {
       detached: true,
       stdio: "ignore"
     });
@@ -240,12 +230,11 @@ function fmtPct(n) {
 function fmtLines(added, removed) {
   return `+${added}/-${removed}`;
 }
-function normalizeQuotaUtilization(value) {
-  if (typeof value !== "number") return null;
-  return Math.round(value > 1 ? value : value * 100);
-}
 var MODEL_NAMES = {
+  "claude-fable-5": "Fable",
+  "claude-opus-4-8": "Opus",
   "claude-opus-4-6": "Opus",
+  "claude-sonnet-5": "Sonnet",
   "claude-sonnet-4-6": "Sonnet",
   "claude-haiku-4-5-20251001": "Haiku",
   "gpt-5.5": "GPT-5.5",
@@ -260,6 +249,8 @@ function modelDisplayName(modelId) {
   return modelId;
 }
 var MODEL_COLORS = {
+  "claude-fable-5": YELLOW,
+  "claude-opus-4-8": MAGENTA,
   "claude-opus-4-6": MAGENTA,
   "claude-sonnet-4-6": CYAN,
   "claude-haiku-4-5-20251001": GREEN,
@@ -269,6 +260,7 @@ var MODEL_COLORS = {
 };
 function modelColor(modelId) {
   if (MODEL_COLORS[modelId]) return MODEL_COLORS[modelId];
+  if (modelId.includes("fable")) return YELLOW;
   if (modelId.includes("opus")) return MAGENTA;
   if (modelId.includes("sonnet")) return CYAN;
   if (modelId.includes("haiku")) return GREEN;
@@ -300,9 +292,9 @@ function bold(text) {
 // src/collector.ts
 function readConfig() {
   const configPath = getConfigPath();
-  if (!fs5.existsSync(configPath)) return DEFAULT_CONFIG;
+  if (!fs4.existsSync(configPath)) return DEFAULT_CONFIG;
   try {
-    const raw = fs5.readFileSync(configPath, "utf8");
+    const raw = fs4.readFileSync(configPath, "utf8");
     return { ...DEFAULT_CONFIG, ...JSON.parse(raw) };
   } catch {
     return DEFAULT_CONFIG;
@@ -333,12 +325,12 @@ function formatQuota(quota, config) {
   const thresholdPct = (config.alerts?.quotaWarningThreshold ?? 0.8) * 100;
   const parts = [];
   if (quota.five_hour) {
-    const pct = Math.round(normalizeQuotaUtilization(quota.five_hour.utilization));
+    const pct = Math.round(quota.five_hour.utilization);
     const color = pct > thresholdPct ? RED : pct > 60 ? YELLOW : GREEN;
     parts.push(`5h:${colorize(fmtPct(pct), color)}`);
   }
   if (quota.seven_day) {
-    const pct = Math.round(normalizeQuotaUtilization(quota.seven_day.utilization));
+    const pct = Math.round(quota.seven_day.utilization);
     const color = pct > thresholdPct ? RED : pct > 60 ? YELLOW : GREEN;
     parts.push(`7d:${colorize(fmtPct(pct), color)}`);
   }
@@ -347,10 +339,10 @@ function formatQuota(quota, config) {
 function formatAlerts(entry, quota, config) {
   const alerts = [];
   const thresholdPct = (config.alerts?.quotaWarningThreshold ?? 0.8) * 100;
-  if (quota?.five_hour && normalizeQuotaUtilization(quota.five_hour.utilization) > thresholdPct) {
+  if (quota?.five_hour && quota.five_hour.utilization > thresholdPct) {
     alerts.push(colorize("\u26A05h", RED));
   }
-  if (quota?.seven_day && normalizeQuotaUtilization(quota.seven_day.utilization) > thresholdPct) {
+  if (quota?.seven_day && quota.seven_day.utilization > thresholdPct) {
     alerts.push(colorize("\u26A07d", RED));
   }
   if (config.alerts?.costDailyBudget && entry.cost > config.alerts.costDailyBudget) {
@@ -358,10 +350,22 @@ function formatAlerts(entry, quota, config) {
   }
   return alerts.length > 0 ? " " + alerts.join(" ") : "";
 }
-function formatStatusline(entry, config) {
+function schemaDriftWarning(parsed) {
+  const missing = [];
+  if (!parsed.context_window) {
+    missing.push("context_window");
+  } else {
+    if (parsed.context_window.current_usage === void 0) missing.push("context_window.current_usage");
+    if (parsed.context_window.used_percentage === void 0) missing.push("context_window.used_percentage");
+  }
+  if (!parsed.cost) missing.push("cost");
+  if (missing.length === 0) return null;
+  return `token-burningman: statusline payload missing ${missing.join(", ")} \u2014 Claude Code schema may have changed; token/cost analytics will record zeros`;
+}
+function formatStatusline(entry, config, extras) {
   const format = config.display?.statuslineFormat || "full";
   if (format === "off") return "";
-  const modelName = modelDisplayName(entry.model);
+  const modelName = modelDisplayName(entry.model) + (extras?.fastMode ? "\u26A1" : "");
   const mColor = modelColor(entry.model);
   const cost = colorize(fmtCost(entry.cost), YELLOW);
   const ctxPct = entry.ctx;
@@ -381,14 +385,15 @@ function formatStatusline(entry, config) {
     case "full":
     default: {
       const quotaPart = quotaStr ? ` | ${quotaStr}` : "";
-      return `${colorize(bold(`[${modelName}]`), mColor)} ${cost} | ${ctx}${quotaPart} | ${lines} | cache:${colorize(fmtPct(cache), cColor)}${alertStr}`;
+      const effortPart = extras?.effortLevel ? ` | ${colorize(`eff:${extras.effortLevel}`, DIM)}` : "";
+      return `${colorize(bold(`[${modelName}]`), mColor)} ${cost} | ${ctx}${quotaPart}${effortPart} | ${lines} | cache:${colorize(fmtPct(cache), cColor)}${alertStr}`;
     }
   }
 }
 function main() {
   let stdinData;
   try {
-    stdinData = fs5.readFileSync(0, "utf8");
+    stdinData = fs4.readFileSync(0, "utf8");
   } catch {
     process.stdout.write("[?]");
     return;
@@ -411,20 +416,32 @@ function main() {
   ensureStorageDirs();
   const entry = extractEntry(parsed);
   appendJsonl(getSessionFilePath(entry.sid), entry);
+  updateQuotaStateFromStatusline(parsed.rate_limits);
   const config = readConfig();
-  const line = formatStatusline(entry, config);
-  process.stdout.write(line);
-  const totalTokens = entry.tin + entry.tout;
-  if (shouldFetchQuota(config, totalTokens, entry.sid)) {
-    markQuotaFetchTriggered(totalTokens, entry.sid);
-    triggerQuotaFetchBackground(path5.dirname(process.argv[1] || __filename));
+  let line = formatStatusline(entry, config, {
+    effortLevel: parsed.effort?.level,
+    fastMode: parsed.fast_mode
+  });
+  const driftWarning = schemaDriftWarning(parsed);
+  if (driftWarning) {
+    process.stderr.write(driftWarning + "\n");
+    if (line) line += " " + colorize("[!schema]", RED);
   }
+  process.stdout.write(line);
   if (shouldRunHourlyMaintenance(config)) {
     triggerHourlyMaintenanceBackground(path5.dirname(process.argv[1] || __filename));
   }
 }
-try {
-  main();
-} catch {
-  process.stdout.write("[!]");
+if (typeof require !== "undefined" && typeof module !== "undefined" && require.main === module) {
+  try {
+    main();
+  } catch {
+    process.stdout.write("[!]");
+  }
 }
+// Annotate the CommonJS export names for ESM import in node:
+0 && (module.exports = {
+  extractEntry,
+  formatStatusline,
+  schemaDriftWarning
+});

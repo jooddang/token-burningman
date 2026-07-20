@@ -6,7 +6,7 @@ import {
   readJsonl,
   sessionIdFromPath,
 } from "../utils/storage.js";
-import { cacheHitRate, modelDisplayName, normalizeQuotaUtilization } from "../utils/format.js";
+import { cacheHitRate, modelDisplayName } from "../utils/format.js";
 import { readQuotaState } from "../quota.js";
 import {
   getCacheRateTrend,
@@ -44,15 +44,20 @@ function cached<T>(key: string, fn: () => T): T {
   return data;
 }
 
+function roundUtilization(value: number | null | undefined): number | null {
+  if (typeof value !== "number") return null;
+  return Math.round(value);
+}
+
 function summarizeQuota(quota: QuotaState | null): QuotaSummary | null {
   if (!quota || (!quota.five_hour && !quota.seven_day)) {
     return null;
   }
 
   return {
-    fiveHourPct: normalizeQuotaUtilization(quota.five_hour?.utilization),
+    fiveHourPct: roundUtilization(quota.five_hour?.utilization),
     fiveHourResetsAt: quota.five_hour?.resets_at ?? null,
-    sevenDayPct: normalizeQuotaUtilization(quota.seven_day?.utilization),
+    sevenDayPct: roundUtilization(quota.seven_day?.utilization),
     sevenDayResetsAt: quota.seven_day?.resets_at ?? null,
   };
 }

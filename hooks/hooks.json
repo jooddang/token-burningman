@@ -1,13 +1,35 @@
 {
-  "description": "token-burningman hooks for session aggregation",
+  "description": "token-burningman hooks: statusline binary sync on setup/session start, session aggregation on session end",
   "hooks": {
+    "Setup": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/bin/plugin-setup.cjs\" \"${CLAUDE_PLUGIN_DATA}\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/bin/plugin-setup.cjs\" \"${CLAUDE_PLUGIN_DATA}\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
     "SessionEnd": [
       {
         "matcher": "*",
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PLUGIN_ROOT\"/bin/aggregate.cjs",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}\"/bin/aggregate.cjs",
             "timeout": 30
           }
         ]

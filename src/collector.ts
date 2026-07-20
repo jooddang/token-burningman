@@ -4,7 +4,7 @@ import type { StatuslineInput, SessionEntry, Config } from "./types.js";
 import { DEFAULT_CONFIG } from "./types.js";
 import { appendJsonl, getSessionFilePath, getConfigPath, ensureStorageDirs } from "./utils/storage.js";
 import type { QuotaState } from "./types.js";
-import { shouldFetchQuota, triggerQuotaFetchBackground, readQuotaState, markQuotaFetchTriggered } from "./quota.js";
+import { readQuotaState, updateQuotaStateFromStatusline } from "./quota.js";
 import { shouldRunHourlyMaintenance, triggerHourlyMaintenanceBackground } from "./maintenance.js";
 import {
   fmtCost,
@@ -17,10 +17,10 @@ import {
   cacheHitRate,
   colorize,
   bold,
-  normalizeQuotaUtilization,
   YELLOW,
   RED,
   GREEN,
+  DIM,
 } from "./utils/format.js";
 
 function readConfig(): Config {
@@ -34,7 +34,7 @@ function readConfig(): Config {
   }
 }
 
-function extractEntry(parsed: StatuslineInput): SessionEntry {
+export function extractEntry(parsed: StatuslineInput): SessionEntry {
   const cu = parsed.context_window?.current_usage;
   return {
     t: Date.now(),
@@ -62,12 +62,12 @@ function formatQuota(quota: QuotaState | null, config: Config): string {
   const parts: string[] = [];
 
   if (quota.five_hour) {
-    const pct = Math.round(normalizeQuotaUtilization(quota.five_hour.utilization)!);
+    const pct = Math.round(quota.five_hour.utilization);
     const color = pct > thresholdPct ? RED : pct > 60 ? YELLOW : GREEN;
     parts.push(`5h:${colorize(fmtPct(pct), color)}`);
   }
   if (quota.seven_day) {
-    const pct = Math.round(normalizeQuotaUtilization(quota.seven_day.utilization)!);
+    const pct = Math.round(quota.seven_day.utilization);
     const color = pct > thresholdPct ? RED : pct > 60 ? YELLOW : GREEN;
     parts.push(`7d:${colorize(fmtPct(pct), color)}`);
   }
@@ -79,10 +79,10 @@ function formatAlerts(entry: SessionEntry, quota: QuotaState | null, config: Con
   const alerts: string[] = [];
   const thresholdPct = (config.alerts?.quotaWarningThreshold ?? 0.8) * 100;
 
-  if (quota?.five_hour && normalizeQuotaUtilization(quota.five_hour.utilization)! > thresholdPct) {
+  if (quota?.five_hour && quota.five_hour.utilization > thresholdPct) {
     alerts.push(colorize("⚠5h", RED));
   }
-  if (quota?.seven_day && normalizeQuotaUtilization(quota.seven_day.utilization)! > thresholdPct) {
+  if (quota?.seven_day && quota.seven_day.utilization > thresholdPct) {
     alerts.push(colorize("⚠7d", RED));
   }
   if (config.alerts?.costDailyBudget && entry.cost > config.alerts.costDailyBudget) {
@@ -92,11 +92,36 @@ function formatAlerts(entry: SessionEntry, quota: QuotaState | null, config: Con
   return alerts.length > 0 ? " " + alerts.join(" ") : "";
 }
 
-function formatStatusline(entry: SessionEntry, config: Config): string {
+/**
+ * Detect statusline payload schema drift. The collector defaults every field
+ * to 0, so a renamed/removed section would silently flatline all analytics —
+ * surface it loudly instead.
+ */
+export function schemaDriftWarning(parsed: StatuslineInput): string | null {
+  const missing: string[] = [];
+  if (!parsed.context_window) {
+    missing.push("context_window");
+  } else {
+    // Absent key (undefined) means renamed/dropped — schema drift. Explicit
+    // null is legitimate: before the first API call and after /compact.
+    if (parsed.context_window.current_usage === undefined) missing.push("context_window.current_usage");
+    if (parsed.context_window.used_percentage === undefined) missing.push("context_window.used_percentage");
+  }
+  if (!parsed.cost) missing.push("cost");
+  if (missing.length === 0) return null;
+  return `token-burningman: statusline payload missing ${missing.join(", ")} — Claude Code schema may have changed; token/cost analytics will record zeros`;
+}
+
+export interface StatuslineExtras {
+  effortLevel?: string;
+  fastMode?: boolean;
+}
+
+export function formatStatusline(entry: SessionEntry, config: Config, extras?: StatuslineExtras): string {
   const format = config.display?.statuslineFormat || "full";
   if (format === "off") return "";
 
-  const modelName = modelDisplayName(entry.model);
+  const modelName = modelDisplayName(entry.model) + (extras?.fastMode ? "⚡" : "");
   const mColor = modelColor(entry.model);
   const cost = colorize(fmtCost(entry.cost), YELLOW);
   const ctxPct = entry.ctx;
@@ -118,7 +143,8 @@ function formatStatusline(entry: SessionEntry, config: Config): string {
     case "full":
     default: {
       const quotaPart = quotaStr ? ` | ${quotaStr}` : "";
-      return `${colorize(bold(`[${modelName}]`), mColor)} ${cost} | ${ctx}${quotaPart} | ${lines} | cache:${colorize(fmtPct(cache), cColor)}${alertStr}`;
+      const effortPart = extras?.effortLevel ? ` | ${colorize(`eff:${extras.effortLevel}`, DIM)}` : "";
+      return `${colorize(bold(`[${modelName}]`), mColor)} ${cost} | ${ctx}${quotaPart}${effortPart} | ${lines} | cache:${colorize(fmtPct(cache), cColor)}${alertStr}`;
     }
   }
 }
@@ -158,17 +184,22 @@ function main(): void {
   const entry = extractEntry(parsed);
   appendJsonl(getSessionFilePath(entry.sid), entry);
 
+  // Persist official rate-limit data before rendering so the quota segment
+  // reflects this tick.
+  updateQuotaStateFromStatusline(parsed.rate_limits);
+
   // Load config and format output
   const config = readConfig();
-  const line = formatStatusline(entry, config);
-  process.stdout.write(line);
-
-  // Maybe trigger background quota fetch (non-blocking)
-  const totalTokens = entry.tin + entry.tout;
-  if (shouldFetchQuota(config, totalTokens, entry.sid)) {
-    markQuotaFetchTriggered(totalTokens, entry.sid);
-    triggerQuotaFetchBackground(path.dirname(process.argv[1] || __filename));
+  let line = formatStatusline(entry, config, {
+    effortLevel: parsed.effort?.level,
+    fastMode: parsed.fast_mode,
+  });
+  const driftWarning = schemaDriftWarning(parsed);
+  if (driftWarning) {
+    process.stderr.write(driftWarning + "\n");
+    if (line) line += " " + colorize("[!schema]", RED);
   }
+  process.stdout.write(line);
 
   // Opportunistic hourly maintenance driven by active statusline heartbeats.
   if (shouldRunHourlyMaintenance(config)) {
@@ -176,8 +207,10 @@ function main(): void {
   }
 }
 
-try {
-  main();
-} catch {
-  process.stdout.write("[!]");
+if (typeof require !== "undefined" && typeof module !== "undefined" && require.main === module) {
+  try {
+    main();
+  } catch {
+    process.stdout.write("[!]");
+  }
 }

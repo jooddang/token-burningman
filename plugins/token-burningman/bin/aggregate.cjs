@@ -362,13 +362,11 @@ var DEFAULT_CONFIG = {
     statuslineFormat: "full",
     currency: "USD",
     timezone: "system",
-    colorScheme: "auto"
+    colorScheme: "auto",
+    chainStatusline: true
   },
   collection: {
     enabled: true,
-    quotaPollingIntervalMin: 1,
-    quotaPollingMinSec: 30,
-    quotaPollingTokenDelta: 2e4,
     hourlyMaintenanceIntervalMin: 60,
     sessionRetentionDays: 90,
     archiveAfterDays: 30

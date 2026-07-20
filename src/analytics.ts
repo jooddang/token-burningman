@@ -89,13 +89,15 @@ export function getProjectStats(rangeDays: number): ProjectStat[] {
     );
     const modelMix: Record<string, number> = {};
     for (const [model, tokens] of p.modelTokens) {
-      const shortName = model.includes("opus")
-        ? "Opus"
-        : model.includes("sonnet")
-          ? "Sonnet"
-          : model.includes("haiku")
-            ? "Haiku"
-            : model;
+      const shortName = model.includes("fable")
+        ? "Fable"
+        : model.includes("opus")
+          ? "Opus"
+          : model.includes("sonnet")
+            ? "Sonnet"
+            : model.includes("haiku")
+              ? "Haiku"
+              : model;
       modelMix[shortName] =
         totalModelTokens > 0 ? Math.round((tokens / totalModelTokens) * 100) : 0;
     }

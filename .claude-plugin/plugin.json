@@ -22,16 +22,5 @@
   "commands": "./commands/",
   "skills": "./skills/",
   "mcpServers": "./.mcp.json",
-  "hooks": {
-    "Setup": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$CLAUDE_PLUGIN_ROOT/bin/plugin-setup.cjs\""
-          }
-        ]
-      }
-    ]
-  }
+  "hooks": "./hooks/hooks.json"
 }

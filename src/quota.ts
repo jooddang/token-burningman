@@ -1,14 +1,9 @@
-import * as fs from "node:fs";
 import * as path from "node:path";
-import * as https from "node:https";
-import { execFileSync } from "node:child_process";
-import type { QuotaState, QuotaTriggerState, Config } from "./types.js";
-import { readJson, writeJsonAtomic, appendJsonl, getStorageDir, acquireLock, releaseLock } from "./utils/storage.js";
+import type { QuotaState, StatuslineRateLimits } from "./types.js";
+import { readJson, writeJsonAtomic, appendJsonl, getStorageDir } from "./utils/storage.js";
 
 const QUOTA_STATE_PATH = () => path.join(getStorageDir(), "quota", "state.json");
 const QUOTA_HISTORY_PATH = () => path.join(getStorageDir(), "quota", "history.jsonl");
-const QUOTA_LOCK_PATH = () => path.join(getStorageDir(), "quota", "fetch.lock");
-const QUOTA_TRIGGER_PATH = () => path.join(getStorageDir(), "quota", "trigger.json");
 
 const DEFAULT_QUOTA_STATE: QuotaState = {
   lastFetchedAt: 0,
@@ -16,208 +11,52 @@ const DEFAULT_QUOTA_STATE: QuotaState = {
   seven_day: null,
 };
 
-const DEFAULT_QUOTA_TRIGGER: QuotaTriggerState = {
-  lastTriggerAt: 0,
-  tokensAtLastTrigger: 0,
-  sid: "",
-};
+// Skip rewriting an unchanged state more often than this; the collector
+// runs on every statusline render.
+const QUOTA_REFRESH_MS = 60_000;
 
 export function readQuotaState(): QuotaState {
   return readJson<QuotaState>(QUOTA_STATE_PATH(), DEFAULT_QUOTA_STATE);
 }
 
-export function readQuotaTrigger(): QuotaTriggerState {
-  return readJson<QuotaTriggerState>(QUOTA_TRIGGER_PATH(), DEFAULT_QUOTA_TRIGGER);
-}
-
-export function markQuotaFetchTriggered(tokens: number, sid: string): void {
-  writeJsonAtomic(QUOTA_TRIGGER_PATH(), {
-    lastTriggerAt: Date.now(),
-    tokensAtLastTrigger: tokens,
-    sid,
-  });
+function toIsoTimestamp(epochSeconds: number): string {
+  if (!Number.isFinite(epochSeconds)) return "";
+  return new Date(epochSeconds * 1000).toISOString();
 }
 
 /**
- * Hybrid gating: min-second floor + interval ceiling + token-delta fast path.
- * - Below `quotaPollingMinSec`: never refetch (rate-limit guard).
- * - At/above `quotaPollingIntervalMin`: always refetch (freshness ceiling).
- * - In between: refetch when cumulative token delta since last trigger exceeds
- *   `quotaPollingTokenDelta`, or when the session id changed.
+ * Persist the official rate-limit data from the statusline payload into the
+ * quota state consumed by the statusline renderer, TUI, and dashboard.
+ * Each window may be independently absent; an absent window preserves the
+ * previously known value.
  */
-export function shouldFetchQuota(
-  config: Config,
-  currentTokens: number = 0,
-  sid: string = "",
-): boolean {
-  const state = readQuotaState();
-  const trigger = readQuotaTrigger();
-  const now = Date.now();
-  const lastActivityAt = Math.max(state.lastFetchedAt, trigger.lastTriggerAt);
-  const elapsed = now - lastActivityAt;
+export function updateQuotaStateFromStatusline(rateLimits: StatuslineRateLimits | undefined): void {
+  const fiveHour = rateLimits?.five_hour ?? null;
+  const sevenDay = rateLimits?.seven_day ?? null;
+  if (!fiveHour && !sevenDay) return;
 
-  const minMs = (config.collection?.quotaPollingMinSec ?? 30) * 1000;
-  const intervalMs = (config.collection?.quotaPollingIntervalMin ?? 1) * 60_000;
+  const previous = readQuotaState();
+  const next: QuotaState = {
+    lastFetchedAt: Date.now(),
+    five_hour: fiveHour
+      ? { utilization: fiveHour.used_percentage, resets_at: toIsoTimestamp(fiveHour.resets_at) }
+      : previous.five_hour,
+    seven_day: sevenDay
+      ? { utilization: sevenDay.used_percentage, resets_at: toIsoTimestamp(sevenDay.resets_at) }
+      : previous.seven_day,
+  };
 
-  if (elapsed < minMs) return false;
-  if (elapsed >= intervalMs) return true;
+  const unchanged =
+    previous.five_hour?.utilization === next.five_hour?.utilization &&
+    previous.seven_day?.utilization === next.seven_day?.utilization;
+  if (unchanged && Date.now() - previous.lastFetchedAt < QUOTA_REFRESH_MS) return;
 
-  if (sid && trigger.sid && sid !== trigger.sid) return true;
-
-  const threshold = config.collection?.quotaPollingTokenDelta ?? 20000;
-  const delta = currentTokens - trigger.tokensAtLastTrigger;
-  return delta >= threshold;
-}
-
-/**
- * Extract OAuth token from macOS Keychain or fallback credentials file.
- */
-export function getOAuthToken(): string | null {
-  // Try macOS Keychain first
-  if (process.platform === "darwin") {
-    try {
-      const raw = execFileSync(
-        "security",
-        ["find-generic-password", "-s", "Claude Code-credentials", "-w"],
-        { encoding: "utf8", timeout: 3000, stdio: ["pipe", "pipe", "ignore"] },
-      ).trim();
-      const parsed = JSON.parse(raw);
-      // Handle nested structures: {claudeAiOauth: {accessToken: "..."}}
-      if (parsed.claudeAiOauth?.accessToken) return parsed.claudeAiOauth.accessToken;
-      if (parsed.accessToken) return parsed.accessToken;
-      if (parsed.oauthAccessToken) return parsed.oauthAccessToken;
-      if (typeof parsed === "string") return parsed;
-    } catch {
-      // Keychain not available or entry not found
-    }
-  }
-
-  // Fallback: ~/.claude/.credentials.json
-  const credPath = path.join(
-    process.env.HOME || process.env.USERPROFILE || "",
-    ".claude",
-    ".credentials.json",
-  );
-  try {
-    if (fs.existsSync(credPath)) {
-      const creds = JSON.parse(fs.readFileSync(credPath, "utf8"));
-      return creds.accessToken || creds.oauthAccessToken || null;
-    }
-  } catch {
-    // Ignore
-  }
-
-  return null;
-}
-
-/**
- * Fetch quota from the OAuth usage API.
- * Returns null on any failure (no token, network error, rate limited).
- */
-export function fetchQuota(token: string): Promise<QuotaState | null> {
-  return new Promise((resolve) => {
-    const req = https.request(
-      {
-        hostname: "api.anthropic.com",
-        path: "/api/oauth/usage",
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "anthropic-beta": "oauth-2025-04-20",
-        },
-        rejectUnauthorized: true,
-        timeout: 5000,
-      },
-      (res) => {
-        let body = "";
-        res.on("data", (chunk: Buffer) => {
-          body += chunk.toString();
-        });
-        res.on("end", () => {
-          if (res.statusCode !== 200) {
-            resolve(null);
-            return;
-          }
-          try {
-            const data = JSON.parse(body);
-            resolve({
-              lastFetchedAt: Date.now(),
-              five_hour: data.five_hour || null,
-              seven_day: data.seven_day || null,
-            });
-          } catch {
-            resolve(null);
-          }
-        });
-      },
-    );
-
-    req.on("error", () => resolve(null));
-    req.on("timeout", () => {
-      req.destroy();
-      resolve(null);
-    });
-    req.end();
-  });
-}
-
-/**
- * Fetch quota with file-lock coordination to prevent multiple sessions
- * from hammering the API simultaneously.
- */
-export async function fetchQuotaSafe(config: Config): Promise<QuotaState | null> {
-  const lockPath = QUOTA_LOCK_PATH();
-  const fd = acquireLock(lockPath);
-  if (fd === null) {
-    return null;
-  }
-
-  try {
-    const state = readQuotaState();
-    const minMs = (config.collection?.quotaPollingMinSec ?? 30) * 1000;
-    if (Date.now() - state.lastFetchedAt < minMs) {
-      return state; // Another session just fetched within the rate-limit floor
-    }
-
-    const token = getOAuthToken();
-    if (!token) {
-      return null;
-    }
-
-    const quota = await fetchQuota(token);
-    if (!quota) {
-      return null;
-    }
-
-    writeJsonAtomic(QUOTA_STATE_PATH(), quota);
+  writeJsonAtomic(QUOTA_STATE_PATH(), next);
+  if (!unchanged) {
     appendJsonl(QUOTA_HISTORY_PATH(), {
       t: Date.now(),
-      five_hour: quota.five_hour?.utilization ?? null,
-      seven_day: quota.seven_day?.utilization ?? null,
+      five_hour: next.five_hour?.utilization ?? null,
+      seven_day: next.seven_day?.utilization ?? null,
     });
-
-    return quota;
-  } finally {
-    releaseLock(lockPath, fd);
-  }
-}
-
-/**
- * Spawn a detached quota fetch process so it doesn't block the collector.
- * The fetch-quota-bg.cjs script handles the actual fetch.
- */
-export function triggerQuotaFetchBackground(binDir: string): void {
-  const script = path.join(binDir, "fetch-quota-bg.cjs");
-  if (!fs.existsSync(script)) return;
-
-  try {
-    const { spawn } = require("node:child_process") as typeof import("node:child_process");
-    const child = spawn("node", [script], {
-      detached: true,
-      stdio: "ignore",
-    });
-    child.unref();
-  } catch {
-    // Silently fail — quota is best-effort
   }
 }

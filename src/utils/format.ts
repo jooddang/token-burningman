@@ -35,17 +35,11 @@ export function fmtLines(added: number, removed: number): string {
   return `+${added}/-${removed}`;
 }
 
-/**
- * Normalize utilization: API may return 0-100 (percentage) or 0-1 (fraction).
- * Returns null for non-numeric input.
- */
-export function normalizeQuotaUtilization(value: number | null | undefined): number | null {
-  if (typeof value !== "number") return null;
-  return Math.round(value > 1 ? value : value * 100);
-}
-
 const MODEL_NAMES: Record<string, string> = {
+  "claude-fable-5": "Fable",
+  "claude-opus-4-8": "Opus",
   "claude-opus-4-6": "Opus",
+  "claude-sonnet-5": "Sonnet",
   "claude-sonnet-4-6": "Sonnet",
   "claude-haiku-4-5-20251001": "Haiku",
   "gpt-5.5": "GPT-5.5",
@@ -63,6 +57,8 @@ export function modelDisplayName(modelId: string): string {
 }
 
 const MODEL_COLORS: Record<string, string> = {
+  "claude-fable-5": YELLOW,
+  "claude-opus-4-8": MAGENTA,
   "claude-opus-4-6": MAGENTA,
   "claude-sonnet-4-6": CYAN,
   "claude-haiku-4-5-20251001": GREEN,
@@ -73,6 +69,7 @@ const MODEL_COLORS: Record<string, string> = {
 
 export function modelColor(modelId: string): string {
   if (MODEL_COLORS[modelId]) return MODEL_COLORS[modelId];
+  if (modelId.includes("fable")) return YELLOW;
   if (modelId.includes("opus")) return MAGENTA;
   if (modelId.includes("sonnet")) return CYAN;
   if (modelId.includes("haiku")) return GREEN;

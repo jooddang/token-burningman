@@ -29,7 +29,26 @@ export interface StatuslineInput {
     total_input_tokens: number;
     total_output_tokens: number;
   };
+  exceeds_200k_tokens?: boolean;
+  fast_mode?: boolean;
+  effort?: {
+    level: string;
+  };
+  rate_limits?: StatuslineRateLimits;
+  session_name?: string;
+  pr?: {
+    number?: number;
+    url?: string;
+    review_state?: string;
+  };
   version: string;
+}
+
+// Official rate-limit block in the statusline payload (Pro/Max only; each
+// window may be independently absent). resets_at is Unix epoch seconds.
+export interface StatuslineRateLimits {
+  five_hour?: { used_percentage: number; resets_at: number } | null;
+  seven_day?: { used_percentage: number; resets_at: number } | null;
 }
 
 // Compact JSONL entry persisted per statusline invocation
@@ -97,20 +116,12 @@ export interface AggregationMeta {
   [sessionId: string]: number; // last processed line index
 }
 
-// Quota state from OAuth usage API
+// Quota state persisted from statusline rate_limits (Claude) or rollout
+// rate limits (Codex). utilization is canonically 0-100.
 export interface QuotaState {
   lastFetchedAt: number;
   five_hour: { utilization: number; resets_at: string } | null;
   seven_day: { utilization: number; resets_at: string } | null;
-}
-
-// Lightweight activity tracker for quota-fetch trigger decisions.
-// Written by the collector on every tick that decides to trigger a fetch,
-// read by shouldFetchQuota to compute a token delta since the last trigger.
-export interface QuotaTriggerState {
-  lastTriggerAt: number;
-  tokensAtLastTrigger: number;
-  sid: string;
 }
 
 // Per-project analytics summary
@@ -155,12 +166,10 @@ export interface Config {
     currency: string;
     timezone: string;
     colorScheme: "auto" | "dark" | "light" | "mono";
+    chainStatusline?: boolean;
   };
   collection: {
     enabled: boolean;
-    quotaPollingIntervalMin: number;
-    quotaPollingMinSec: number;
-    quotaPollingTokenDelta: number;
     hourlyMaintenanceIntervalMin: number;
     sessionRetentionDays: number;
     archiveAfterDays: number;
@@ -189,12 +198,10 @@ export const DEFAULT_CONFIG: Config = {
     currency: "USD",
     timezone: "system",
     colorScheme: "auto",
+    chainStatusline: true,
   },
   collection: {
     enabled: true,
-    quotaPollingIntervalMin: 1,
-    quotaPollingMinSec: 30,
-    quotaPollingTokenDelta: 20000,
     hourlyMaintenanceIntervalMin: 60,
     sessionRetentionDays: 90,
     archiveAfterDays: 30,

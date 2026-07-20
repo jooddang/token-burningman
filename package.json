@@ -9,7 +9,9 @@
     "burningman-statusline": "./bin/collector.cjs",
     "token-burningman-statusline": "./bin/collector.cjs",
     "burningman-codex-import": "./bin/codex-import.cjs",
-    "token-burningman-codex-import": "./bin/codex-import.cjs"
+    "token-burningman-codex-import": "./bin/codex-import.cjs",
+    "burningman-mcp": "./bin/mcp.cjs",
+    "token-burningman-mcp": "./bin/mcp.cjs"
   },
   "files": [
     "bin/",

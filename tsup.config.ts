@@ -23,22 +23,6 @@ export default defineConfig([
     clean: false,
   },
   {
-    entry: { "fetch-quota-bg": "src/fetch-quota-bg.ts" },
-    outDir: "bin",
-    format: "cjs",
-    target: "node20",
-    platform: "node",
-    bundle: true,
-    minify: false,
-    sourcemap: false,
-    define: {
-      __APP_VERSION__: APP_VERSION,
-    },
-    noExternal: [/.*/],
-    banner: { js: "#!/usr/bin/env node" },
-    clean: false,
-  },
-  {
     entry: { "hourly-maintenance-bg": "src/hourly-maintenance-bg.ts" },
     outDir: "bin",
     format: "cjs",
