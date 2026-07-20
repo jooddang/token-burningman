@@ -1,0 +1,11 @@
+onlyBuiltDependencies:
+  - esbuild
+overrides:
+  path-to-regexp: ^8.4.0
+  hono: '>=4.12.25'
+  '@hono/node-server': '>=1.19.13'
+  shell-quote: '>=1.8.5'
+  fast-uri: '>=3.1.2'
+  ip-address: '>=10.1.1'
+  qs: '>=6.15.2'
+  ws: '>=8.21.0'
