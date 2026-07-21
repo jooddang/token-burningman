@@ -10,6 +10,7 @@ import {
   getHourlyDir,
   getStorageDir,
   acquireLock,
+  refreshLock,
   releaseLock,
 } from "./utils/storage.js";
 
@@ -40,6 +41,9 @@ interface ReportBatchPlan {
 
 const REPORT_BATCH_TARGET = 100;
 const MAX_REPORTS_PER_HOUR = 500;
+const REPORT_REQUEST_BASE_TIMEOUT_MS = 30_000;
+const REPORT_REQUEST_TIMEOUT_PER_ENTRY_MS = 1_000;
+const MAX_REPORT_REQUEST_TIMEOUT_MS = 600_000;
 const REPORT_FIELD_LIMITS = {
   inputTokens: 50_000_000,
   outputTokens: 50_000_000,
@@ -67,6 +71,13 @@ export function saturateReportMetric(value: unknown, max: number, integer = fals
   return integer ? Math.trunc(boundedValue) : boundedValue;
 }
 
+export function getReportRequestTimeoutMs(entryCount: number): number {
+  return Math.min(
+    REPORT_REQUEST_BASE_TIMEOUT_MS + entryCount * REPORT_REQUEST_TIMEOUT_PER_ENTRY_MS,
+    MAX_REPORT_REQUEST_TIMEOUT_MS,
+  );
+}
+
 /**
  * Build report entries from unreported hourly data.
  */
@@ -87,7 +98,11 @@ function buildReportEntries(lastReportedHour: string | null): ReportEntry[] {
     for (const [hourStr, models] of Object.entries(hourly)) {
       const hourIso = `${dateStr}T${hourStr.padStart(2, "0")}:00:00Z`;
 
-      if (lastReportedHour && hourIso <= lastReportedHour) continue;
+      // Replay the checkpoint hour because an active session can continue to
+      // add usage to its current hourly bucket after a successful report. The
+      // server update is idempotent for user/hour/model; only older hours are
+      // safe to exclude permanently.
+      if (lastReportedHour && hourIso < lastReportedHour) continue;
 
       for (const [model, bucket] of Object.entries(models) as [string, HourlyBucket][]) {
         if (!Array.isArray(bucket.sessions)) {
@@ -217,6 +232,7 @@ async function submitReportBatch(
   config: Config,
   serverUrl: string,
   entries: ReportEntry[],
+  timeoutOverrideMs?: number,
 ): Promise<boolean> {
   const body = JSON.stringify({
     v: 1,
@@ -226,6 +242,20 @@ async function submitReportBatch(
   return new Promise((resolve) => {
     const url = new URL(`${serverUrl}/report`);
     const transport = url.protocol === "https:" ? https : http;
+    const requestTimeoutMs =
+      typeof timeoutOverrideMs === "number" &&
+      Number.isFinite(timeoutOverrideMs) &&
+      timeoutOverrideMs > 0
+        ? timeoutOverrideMs
+        : getReportRequestTimeoutMs(entries.length);
+    let deadline: NodeJS.Timeout | undefined;
+    let settled = false;
+    const finish = (result: boolean): void => {
+      if (settled) return;
+      settled = true;
+      if (deadline) clearTimeout(deadline);
+      resolve(result);
+    };
     const req = transport.request(
       {
         hostname: url.hostname,
@@ -238,27 +268,31 @@ async function submitReportBatch(
           "Authorization": `Bearer ${config.publicReporting.cliToken}`,
         },
         rejectUnauthorized: true,
-        timeout: 10000,
+        timeout: requestTimeoutMs,
       },
       (res) => {
-        res.on("aborted", () => resolve(false));
-        res.on("error", () => resolve(false));
+        res.on("aborted", () => finish(false));
+        res.on("error", () => finish(false));
         res.on("end", () => {
           if (res.statusCode === 200) {
-            resolve(true);
+            finish(true);
           } else if (res.statusCode === 401) {
             config.publicReporting.cliToken = null;
             writeJsonAtomic(getConfigPath(), config);
-            resolve(false);
+            finish(false);
           } else {
-            resolve(false);
+            finish(false);
           }
         });
         res.resume();
       },
     );
-    req.on("error", () => resolve(false));
-    req.on("timeout", () => { req.destroy(); resolve(false); });
+    req.on("error", () => finish(false));
+    req.on("timeout", () => { req.destroy(); finish(false); });
+    deadline = setTimeout(() => {
+      req.destroy();
+      finish(false);
+    }, requestTimeoutMs);
     req.write(body);
     req.end();
   });
@@ -267,7 +301,10 @@ async function submitReportBatch(
 /**
  * Submit hourly report batch to the community server.
  */
-export async function submitPublicReport(config: Config): Promise<boolean> {
+export async function submitPublicReport(
+  config: Config,
+  options: { requestTimeoutMs?: number } = {},
+): Promise<boolean> {
   const cliToken = config.publicReporting?.cliToken;
   if (!cliToken) return false; // Not logged in — skip reporting
 
@@ -295,8 +332,15 @@ export async function submitPublicReport(config: Config): Promise<boolean> {
     const plan = buildReportBatches(entries);
 
     for (const batch of plan.batches) {
-      const submitted = await submitReportBatch(config, serverUrl, batch.entries);
+      if (!refreshLock(reportLockPath, reportLockFd)) return false;
+      const submitted = await submitReportBatch(
+        config,
+        serverUrl,
+        batch.entries,
+        options.requestTimeoutMs,
+      );
       if (!submitted) return false;
+      if (!refreshLock(reportLockPath, reportLockFd)) return false;
       writeJsonAtomic(statePath, { lastReportedHour: batch.lastHour });
     }
 

@@ -1,6 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
+import * as lockfile from "proper-lockfile";
 
 const DEFAULT_STORAGE_DIR = path.join(os.homedir(), ".token-burningman");
 
@@ -115,36 +116,68 @@ export function sessionIdFromPath(filePath: string): string {
 
 const DEFAULT_LOCK_STALE_MS = 15 * 60_000;
 
-export function acquireLock(lockPath: string, staleMs = DEFAULT_LOCK_STALE_MS): number | null {
-  ensureDir(path.dirname(lockPath));
+export interface LockHandle {
+  readonly compromised: boolean;
+  release: () => void;
+}
 
+export function acquireLock(
+  lockPath: string,
+  staleMs = DEFAULT_LOCK_STALE_MS,
+): LockHandle | null {
+  ensureDir(path.dirname(lockPath));
   try {
-    return fs.openSync(lockPath, "wx", 0o600);
-  } catch {
-    try {
-      const stat = fs.statSync(lockPath);
-      if (Date.now() - stat.mtimeMs > staleMs) {
+    const legacy = fs.lstatSync(lockPath);
+    if (legacy.isFile()) {
+      if (Date.now() - legacy.mtimeMs <= staleMs) return null;
+      try {
+        // Versions through 0.2.2 used a regular file. Only the process that
+        // successfully removes that exact stale artifact may continue; a
+        // competing process that already created the new directory wins.
         fs.unlinkSync(lockPath);
-        return fs.openSync(lockPath, "wx", 0o600);
+      } catch {
+        return null;
       }
-    } catch {
-      // Another process may have removed the lock or it may be unreadable.
+    } else if (!legacy.isDirectory()) {
+      return null;
     }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") return null;
+  }
+
+  let compromised = false;
+  try {
+    const release = lockfile.lockSync(lockPath, {
+      realpath: false,
+      lockfilePath: lockPath,
+      stale: staleMs,
+      update: Math.min(staleMs / 3, 60_000),
+      retries: 0,
+      onCompromised: () => {
+        compromised = true;
+      },
+    });
+    return {
+      get compromised(): boolean {
+        return compromised;
+      },
+      release,
+    };
+  } catch {
     return null;
   }
 }
 
-export function releaseLock(lockPath: string, fd: number | null): void {
-  if (fd !== null) {
+export function refreshLock(_lockPath: string, handle: LockHandle | null): boolean {
+  return handle !== null && !handle.compromised;
+}
+
+export function releaseLock(_lockPath: string, handle: LockHandle | null): void {
+  if (handle !== null) {
     try {
-      fs.closeSync(fd);
+      handle.release();
     } catch {
-      // Ignore close failures.
+      // The lock may already have been released or marked compromised.
     }
-  }
-  try {
-    fs.unlinkSync(lockPath);
-  } catch {
-    // Ignore unlock failures.
   }
 }

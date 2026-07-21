@@ -60,6 +60,10 @@ for (const executable of ["burningman", "burningman-codex-import", "burningman-m
   assert.ok(!target.startsWith("./"), `${executable} target must not start with ./; npm publish removes it`);
   assert.ok(fs.existsSync(path.join(root, target)), `${executable} target ${target} is missing`);
 }
+assert.ok(
+  fs.existsSync(path.join(root, "bin", "report-bg.cjs")),
+  "Claude SessionEnd detached report worker bin/report-bg.cjs is missing",
+);
 
 assert.ok(claudeMarketplaceEntry, "Claude marketplace entry is missing");
 for (const [label, actual] of [

@@ -4,7 +4,7 @@ const require = createRequire(import.meta.url);
 import {
   authenticateCli,
   isAuthenticated
-} from "./chunk-OF2HD2D5.js";
+} from "./chunk-HGABVLSC.js";
 import {
   DEFAULT_CONFIG
 } from "./chunk-4O3443IP.js";
@@ -17,8 +17,9 @@ import {
   listSessionFiles,
   readJson,
   readJsonl,
+  require_signal_exit,
   sessionIdFromPath
-} from "./chunk-P2X3U3Y3.js";
+} from "./chunk-3JXEBFWP.js";
 import {
   __commonJS,
   __export,
@@ -2182,204 +2183,6 @@ var require_react = __commonJS({
     } else {
       module.exports = require_react_development();
     }
-  }
-});
-
-// node_modules/.pnpm/signal-exit@3.0.7/node_modules/signal-exit/signals.js
-var require_signals = __commonJS({
-  "node_modules/.pnpm/signal-exit@3.0.7/node_modules/signal-exit/signals.js"(exports, module) {
-    "use strict";
-    module.exports = [
-      "SIGABRT",
-      "SIGALRM",
-      "SIGHUP",
-      "SIGINT",
-      "SIGTERM"
-    ];
-    if (process.platform !== "win32") {
-      module.exports.push(
-        "SIGVTALRM",
-        "SIGXCPU",
-        "SIGXFSZ",
-        "SIGUSR2",
-        "SIGTRAP",
-        "SIGSYS",
-        "SIGQUIT",
-        "SIGIOT"
-        // should detect profiler and enable/disable accordingly.
-        // see #21
-        // 'SIGPROF'
-      );
-    }
-    if (process.platform === "linux") {
-      module.exports.push(
-        "SIGIO",
-        "SIGPOLL",
-        "SIGPWR",
-        "SIGSTKFLT",
-        "SIGUNUSED"
-      );
-    }
-  }
-});
-
-// node_modules/.pnpm/signal-exit@3.0.7/node_modules/signal-exit/index.js
-var require_signal_exit = __commonJS({
-  "node_modules/.pnpm/signal-exit@3.0.7/node_modules/signal-exit/index.js"(exports, module) {
-    "use strict";
-    var process13 = global.process;
-    var processOk = function(process14) {
-      return process14 && typeof process14 === "object" && typeof process14.removeListener === "function" && typeof process14.emit === "function" && typeof process14.reallyExit === "function" && typeof process14.listeners === "function" && typeof process14.kill === "function" && typeof process14.pid === "number" && typeof process14.on === "function";
-    };
-    if (!processOk(process13)) {
-      module.exports = function() {
-        return function() {
-        };
-      };
-    } else {
-      assert = __require("assert");
-      signals = require_signals();
-      isWin = /^win/i.test(process13.platform);
-      EE = __require("events");
-      if (typeof EE !== "function") {
-        EE = EE.EventEmitter;
-      }
-      if (process13.__signal_exit_emitter__) {
-        emitter = process13.__signal_exit_emitter__;
-      } else {
-        emitter = process13.__signal_exit_emitter__ = new EE();
-        emitter.count = 0;
-        emitter.emitted = {};
-      }
-      if (!emitter.infinite) {
-        emitter.setMaxListeners(Infinity);
-        emitter.infinite = true;
-      }
-      module.exports = function(cb, opts) {
-        if (!processOk(global.process)) {
-          return function() {
-          };
-        }
-        assert.equal(typeof cb, "function", "a callback must be provided for exit handler");
-        if (loaded === false) {
-          load();
-        }
-        var ev = "exit";
-        if (opts && opts.alwaysLast) {
-          ev = "afterexit";
-        }
-        var remove = function() {
-          emitter.removeListener(ev, cb);
-          if (emitter.listeners("exit").length === 0 && emitter.listeners("afterexit").length === 0) {
-            unload();
-          }
-        };
-        emitter.on(ev, cb);
-        return remove;
-      };
-      unload = function unload2() {
-        if (!loaded || !processOk(global.process)) {
-          return;
-        }
-        loaded = false;
-        signals.forEach(function(sig) {
-          try {
-            process13.removeListener(sig, sigListeners[sig]);
-          } catch (er) {
-          }
-        });
-        process13.emit = originalProcessEmit;
-        process13.reallyExit = originalProcessReallyExit;
-        emitter.count -= 1;
-      };
-      module.exports.unload = unload;
-      emit = function emit2(event, code, signal) {
-        if (emitter.emitted[event]) {
-          return;
-        }
-        emitter.emitted[event] = true;
-        emitter.emit(event, code, signal);
-      };
-      sigListeners = {};
-      signals.forEach(function(sig) {
-        sigListeners[sig] = function listener() {
-          if (!processOk(global.process)) {
-            return;
-          }
-          var listeners = process13.listeners(sig);
-          if (listeners.length === emitter.count) {
-            unload();
-            emit("exit", null, sig);
-            emit("afterexit", null, sig);
-            if (isWin && sig === "SIGHUP") {
-              sig = "SIGINT";
-            }
-            process13.kill(process13.pid, sig);
-          }
-        };
-      });
-      module.exports.signals = function() {
-        return signals;
-      };
-      loaded = false;
-      load = function load2() {
-        if (loaded || !processOk(global.process)) {
-          return;
-        }
-        loaded = true;
-        emitter.count += 1;
-        signals = signals.filter(function(sig) {
-          try {
-            process13.on(sig, sigListeners[sig]);
-            return true;
-          } catch (er) {
-            return false;
-          }
-        });
-        process13.emit = processEmit;
-        process13.reallyExit = processReallyExit;
-      };
-      module.exports.load = load;
-      originalProcessReallyExit = process13.reallyExit;
-      processReallyExit = function processReallyExit2(code) {
-        if (!processOk(global.process)) {
-          return;
-        }
-        process13.exitCode = code || /* istanbul ignore next */
-        0;
-        emit("exit", process13.exitCode, null);
-        emit("afterexit", process13.exitCode, null);
-        originalProcessReallyExit.call(process13, process13.exitCode);
-      };
-      originalProcessEmit = process13.emit;
-      processEmit = function processEmit2(ev, arg) {
-        if (ev === "exit" && processOk(global.process)) {
-          if (arg !== void 0) {
-            process13.exitCode = arg;
-          }
-          var ret = originalProcessEmit.apply(this, arguments);
-          emit("exit", process13.exitCode, null);
-          emit("afterexit", process13.exitCode, null);
-          return ret;
-        } else {
-          return originalProcessEmit.apply(this, arguments);
-        }
-      };
-    }
-    var assert;
-    var signals;
-    var isWin;
-    var EE;
-    var emitter;
-    var unload;
-    var emit;
-    var sigListeners;
-    var loaded;
-    var load;
-    var originalProcessReallyExit;
-    var processReallyExit;
-    var originalProcessEmit;
-    var processEmit;
   }
 });
 
@@ -31205,7 +31008,7 @@ function CommunityView() {
         if (input === "s" && (authState === "unauthenticated" || authState === "error")) {
           setAuthState("authenticating");
           setAuthMessage("Opening browser...");
-          import("./setup-THLY4GVA.js").then(({ ensureConfig }) => {
+          import("./setup-A4LGAAAP.js").then(({ ensureConfig }) => {
             const freshConfig = ensureConfig();
             return authenticateCli(freshConfig);
           }).then((ok) => {
@@ -31226,7 +31029,7 @@ function CommunityView() {
           setAuthMessage("Cancelled. Press [s] to try again.");
         }
         if (input === "o" && authState === "authenticated") {
-          import("./storage-KCM6WV3Y.js").then(({ getConfigPath: getConfigPath2, readJson: readJson2, writeJsonAtomic: writeJsonAtomic2 }) => {
+          import("./storage-KFTSBP7K.js").then(({ getConfigPath: getConfigPath2, readJson: readJson2, writeJsonAtomic: writeJsonAtomic2 }) => {
             import("./types-S3LSUVNE.js").then(({ DEFAULT_CONFIG: DEFAULT_CONFIG2 }) => {
               const cfg = readJson2(getConfigPath2(), DEFAULT_CONFIG2);
               cfg.publicReporting.cliToken = null;
@@ -31388,7 +31191,7 @@ function CommunityView() {
 }
 
 // src/version.ts
-var APP_VERSION = "0.2.2";
+var APP_VERSION = "0.2.3";
 
 // src/tui/app.tsx
 var import_jsx_runtime12 = __toESM(require_jsx_runtime(), 1);

@@ -16,7 +16,7 @@ Start from an up-to-date clean `master` branch on Node 22.13 or newer (required 
 ```bash
 git pull --ff-only origin master
 npm view token-burningman versions --json
-pnpm run release:bump 0.2.2
+pnpm run release:bump 0.2.3
 ```
 
 `release:bump` updates the canonical package version plus the Claude Code and Codex manifests. Do not edit the generated `plugins/token-burningman/` mirror by hand.
@@ -49,13 +49,13 @@ Treat every `npm warn publish ... corrected` message as a release blocker. In pa
 Commit the version, generated bundles, manifests, and release documentation together, then push and wait for CI:
 
 ```bash
-git add package.json README.md src tests .claude-plugin .codex-plugin .agents plugins bin docs scripts
-git commit -m "chore: release 0.2.2"
+git add package.json pnpm-lock.yaml tsup.config.ts README.md src tests .claude-plugin .codex-plugin .agents plugins bin docs scripts
+git commit -m "chore: release 0.2.3"
 git push origin master
 RUN_ID=$(gh run list --repo jooddang/token-burningman --commit "$(git rev-parse HEAD)" --limit 1 --json databaseId --jq '.[0].databaseId')
 gh run watch "$RUN_ID" --repo jooddang/token-burningman --exit-status
-git tag v0.2.2
-git push origin v0.2.2
+git tag v0.2.3
+git push origin v0.2.3
 ```
 
 A GitHub Release page is optional; the marketplaces consume the repository and tag, not a GitHub Release asset.
@@ -79,11 +79,11 @@ Registry propagation can take a short time. Verify the dist-tag and execute the 
 npm view token-burningman version dist-tags --json
 SMOKE_DIR=$(mktemp -d)
 (cd "$SMOKE_DIR" && printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"release-smoke","version":"1"}}}' \
-  | npx -y --package=token-burningman@0.2.2 burningman-mcp)
+  | npx -y --package=token-burningman@0.2.3 burningman-mcp)
 rmdir "$SMOKE_DIR"
 ```
 
-The response's `result.serverInfo.version` must be `0.2.2`.
+The response's `result.serverInfo.version` must be `0.2.3`.
 
 Then test the client update paths:
 
@@ -99,6 +99,16 @@ codex plugin add token-burningman@token-burningman
 ```
 
 Claude Code may use `/reload-plugins` instead of a full restart. Codex should be restarted after the marketplace upgrade and plugin add so its skills and bundled MCP server are reloaded.
+
+## 0.2.3 reporting timeout correction
+
+Production verification showed that a valid 100-entry batch can take more than the previous fixed 10-second request timeout while the server performs its per-row upserts. Report requests now receive a wall-clock deadline of `30 seconds + 1 second per entry`, capped at 600 seconds: 130 seconds for the normal 100-entry target and 530 seconds for the supported 500-entry complete-hour maximum. Network, HTTP, and checkpoint behavior is otherwise unchanged.
+
+The report lock uses the pinned `proper-lockfile` atomic-directory primitive with automatic mtime heartbeat and compromise detection. The reporter checks lock health before and after every request, keeping long backlogs serialized across Codex imports, MCP calls, and Claude maintenance.
+
+The last checkpoint hour is deliberately replayed on the next sync. Active sessions can continue adding usage to that bucket after its first successful report, and the server's user/hour/model update is idempotent; replay prevents those late increments from being permanently hidden by the high-watermark.
+
+Claude's 30-second SessionEnd hook performs local aggregation and then launches `report-bg.cjs` as a detached worker. Slow community requests therefore outlive the hook safely instead of being killed before checkpoint cleanup.
 
 ## 0.2.2 reporting contract correction
 

@@ -4,7 +4,7 @@ const require = createRequire(import.meta.url);
 import {
   getConfigPath,
   writeJsonAtomic
-} from "./chunk-P2X3U3Y3.js";
+} from "./chunk-3JXEBFWP.js";
 
 // src/auth.ts
 import * as https from "https";

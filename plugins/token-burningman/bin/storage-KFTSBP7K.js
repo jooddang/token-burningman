@@ -18,10 +18,11 @@ import {
   listSessionFiles,
   readJson,
   readJsonl,
+  refreshLock,
   releaseLock,
   sessionIdFromPath,
   writeJsonAtomic
-} from "./chunk-P2X3U3Y3.js";
+} from "./chunk-3JXEBFWP.js";
 import "./chunk-DXOULAZU.js";
 export {
   acquireLock,
@@ -40,6 +41,7 @@ export {
   listSessionFiles,
   readJson,
   readJsonl,
+  refreshLock,
   releaseLock,
   sessionIdFromPath,
   writeJsonAtomic

@@ -3,7 +3,11 @@ import * as http from "node:http";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { saturateReportMetric, submitPublicReport } from "../src/reporter.js";
+import {
+  getReportRequestTimeoutMs,
+  saturateReportMetric,
+  submitPublicReport,
+} from "../src/reporter.js";
 import type { Config, HourlyAggregate, HourlyBucket } from "../src/types.js";
 import { DEFAULT_CONFIG } from "../src/types.js";
 import {
@@ -11,6 +15,7 @@ import {
   getHourlyFilePath,
   getStorageDir,
   readJson,
+  refreshLock,
   releaseLock,
   writeJsonAtomic,
 } from "../src/utils/storage.js";
@@ -61,7 +66,12 @@ async function startReportServer(
   respond: (
     requestNumber: number,
     batch: CapturedBatch,
-  ) => { status: number; body?: unknown; abortAfterPartialBody?: boolean },
+  ) => {
+    status: number;
+    body?: unknown;
+    abortAfterPartialBody?: boolean;
+    heartbeatWithoutEnding?: boolean;
+  },
 ): Promise<{ serverUrl: string; batches: CapturedBatch[]; close: () => Promise<void> }> {
   const batches: CapturedBatch[] = [];
   const server = http.createServer((request, response) => {
@@ -72,6 +82,12 @@ async function startReportServer(
       const batch = JSON.parse(body) as CapturedBatch;
       batches.push(batch);
       const result = respond(batches.length, batch);
+      if (result.heartbeatWithoutEnding) {
+        response.writeHead(result.status, { "Content-Type": "application/json" });
+        const heartbeat = setInterval(() => response.write(" "), 10);
+        response.on("close", () => clearInterval(heartbeat));
+        return;
+      }
       if (result.abortAfterPartialBody) {
         response.writeHead(result.status, {
           "Content-Type": "application/json",
@@ -143,6 +159,12 @@ describe("community report batching", () => {
     ).lastReportedHour;
   }
 
+  it("scales the request timeout for normal and oversized complete-hour batches", () => {
+    expect(getReportRequestTimeoutMs(100)).toBe(130_000);
+    expect(getReportRequestTimeoutMs(500)).toBe(530_000);
+    expect(getReportRequestTimeoutMs(1_000)).toBe(600_000);
+  });
+
   it("packs complete hours into bounded chronological batches", async () => {
     writeHourly({
       "0": makeHour(60),
@@ -184,7 +206,9 @@ describe("community report batching", () => {
     expect(readCheckpoint()).toBe("2026-01-01T01:00:00Z");
 
     expect(await submitPublicReport(config)).toBe(true);
-    expect(reportServer.batches.map((batch) => batch.reports.length)).toEqual([100, 80, 80, 30]);
+    expect(reportServer.batches.map((batch) => batch.reports.length)).toEqual([
+      100, 80, 40, 80, 30,
+    ]);
     expect(readCheckpoint()).toBe("2026-01-01T03:00:00Z");
   });
 
@@ -205,6 +229,24 @@ describe("community report batching", () => {
 
     expect(reportServer.batches.map((batch) => batch.reports.length)).toEqual([100, 80]);
     expect(readCheckpoint()).toBe("2026-01-01T01:00:00Z");
+  });
+
+  it("enforces a wall-clock deadline even while the response socket stays active", async () => {
+    writeHourly({ "0": makeHour(2) });
+    const reportServer = await startReportServer(() => ({
+      status: 200,
+      heartbeatWithoutEnding: true,
+    }));
+    servers.push(reportServer);
+    const startedAt = Date.now();
+
+    expect(await submitPublicReport(configFor(reportServer.serverUrl), {
+      requestTimeoutMs: 50,
+    })).toBe(false);
+
+    expect(Date.now() - startedAt).toBeLessThan(1_000);
+    expect(reportServer.batches).toHaveLength(1);
+    expect(readCheckpoint()).toBeNull();
   });
 
   it("sends an oversized single-hour group alone instead of splitting the hour", async () => {
@@ -280,6 +322,45 @@ describe("community report batching", () => {
     expect(readCheckpoint()).toBe("2026-01-01T00:00:00Z");
   });
 
+  it("heartbeats an active report lock so stale recovery cannot steal it", async () => {
+    const reportLockPath = path.join(getStorageDir(), ".report.lock");
+    const reportLockFd = acquireLock(reportLockPath, 2_000);
+    expect(reportLockFd).not.toBeNull();
+
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 2_200));
+      expect(refreshLock(reportLockPath, reportLockFd)).toBe(true);
+      expect(acquireLock(reportLockPath, 2_000)).toBeNull();
+    } finally {
+      releaseLock(reportLockPath, reportLockFd);
+    }
+  });
+
+  it("treats a fresh legacy regular-file lock as held", () => {
+    const reportLockPath = path.join(getStorageDir(), ".report.lock");
+    fs.mkdirSync(path.dirname(reportLockPath), { recursive: true });
+    fs.writeFileSync(reportLockPath, "", { mode: 0o600 });
+
+    expect(acquireLock(reportLockPath)).toBeNull();
+    expect(fs.lstatSync(reportLockPath).isFile()).toBe(true);
+  });
+
+  it("migrates a stale legacy regular-file lock to the directory primitive", () => {
+    const reportLockPath = path.join(getStorageDir(), ".report.lock");
+    fs.mkdirSync(path.dirname(reportLockPath), { recursive: true });
+    fs.writeFileSync(reportLockPath, "", { mode: 0o600 });
+    const staleDate = new Date(Date.now() - 16 * 60_000);
+    fs.utimesSync(reportLockPath, staleDate, staleDate);
+
+    const reportLock = acquireLock(reportLockPath);
+    expect(reportLock).not.toBeNull();
+    try {
+      expect(fs.lstatSync(reportLockPath).isDirectory()).toBe(true);
+    } finally {
+      releaseLock(reportLockPath, reportLock);
+    }
+  });
+
   it("sorts hours and models on the wire regardless of source insertion order", async () => {
     writeHourly({
       "01": {
@@ -306,7 +387,8 @@ describe("community report batching", () => {
     expect(readCheckpoint()).toBe("2026-01-01T01:00:00Z");
   });
 
-  it("filters completed hours from an existing checkpoint", async () => {
+  it("replays the checkpoint hour while filtering older hours", async () => {
+    writeHourly({ "23": makeHour(4, 100) }, "2025-12-31");
     writeHourly({
       "0": makeHour(2),
       "1": makeHour(3, 2),
@@ -320,10 +402,28 @@ describe("community report batching", () => {
     expect(await submitPublicReport(configFor(reportServer.serverUrl))).toBe(true);
 
     expect(reportServer.batches).toHaveLength(1);
-    expect(reportServer.batches[0].reports).toHaveLength(3);
+    expect(reportServer.batches[0].reports).toHaveLength(5);
     expect(new Set(reportServer.batches[0].reports.map((report) => report.hour))).toEqual(
-      new Set(["2026-01-01T01:00:00Z"]),
+      new Set(["2026-01-01T00:00:00Z", "2026-01-01T01:00:00Z"]),
     );
+  });
+
+  it("re-reports new usage added to the checkpoint hour", async () => {
+    writeHourly({ "0": { "model-a": makeBucket(1) } });
+    const reportServer = await startReportServer(() => ({ status: 200 }));
+    servers.push(reportServer);
+    const config = configFor(reportServer.serverUrl);
+
+    expect(await submitPublicReport(config)).toBe(true);
+    const updated = readJson<HourlyAggregate>(getHourlyFilePath("2026-01-01"), {});
+    updated["0"]["model-a"].input = 99;
+    writeHourly(updated);
+    expect(await submitPublicReport(config)).toBe(true);
+
+    expect(reportServer.batches).toHaveLength(2);
+    expect(reportServer.batches[0].reports[0].input_tokens).toBe(1);
+    expect(reportServer.batches[1].reports[0].input_tokens).toBe(99);
+    expect(readCheckpoint()).toBe("2026-01-01T00:00:00Z");
   });
 
   it("clears an expired token without advancing the checkpoint", async () => {

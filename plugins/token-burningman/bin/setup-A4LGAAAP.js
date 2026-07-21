@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 import {
   authenticateCli
-} from "./chunk-OF2HD2D5.js";
+} from "./chunk-HGABVLSC.js";
 import {
   DEFAULT_CONFIG
 } from "./chunk-4O3443IP.js";
@@ -13,7 +13,7 @@ import {
   getStorageDir,
   readJson,
   writeJsonAtomic
-} from "./chunk-P2X3U3Y3.js";
+} from "./chunk-3JXEBFWP.js";
 import "./chunk-DXOULAZU.js";
 
 // src/setup.ts

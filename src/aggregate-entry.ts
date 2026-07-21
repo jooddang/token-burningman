@@ -1,8 +1,23 @@
+import * as fs from "node:fs";
+import * as path from "node:path";
+import { spawn } from "node:child_process";
 import { aggregateAllPending } from "./aggregator.js";
-import { ensureStorageDirs, readJson, getConfigPath } from "./utils/storage.js";
-import { submitPublicReport } from "./reporter.js";
-import { DEFAULT_CONFIG } from "./types.js";
-import type { Config } from "./types.js";
+import { ensureStorageDirs } from "./utils/storage.js";
+
+function triggerPublicReportBackground(): void {
+  const binDir = path.dirname(path.resolve(process.argv[1]));
+  const script = path.join(binDir, "report-bg.cjs");
+  if (!fs.existsSync(script)) return;
+  try {
+    const child = spawn(process.execPath, [script], {
+      detached: true,
+      stdio: "ignore",
+    });
+    child.unref();
+  } catch {
+    // Reporting is best-effort and must not hold the Claude SessionEnd hook.
+  }
+}
 
 try {
   ensureStorageDirs();
@@ -13,17 +28,7 @@ try {
     );
   }
 
-  // Submit reports to community server if logged in
-  const config = readJson<Config>(getConfigPath(), DEFAULT_CONFIG);
-  if (config.publicReporting?.cliToken) {
-    submitPublicReport(config).then((ok) => {
-      if (ok) {
-        process.stderr.write("token-burningman: community report submitted\n");
-      }
-    }).catch(() => {
-      // Silent failure — don't block aggregation
-    });
-  }
+  triggerPublicReportBackground();
 } catch (err) {
   process.stderr.write(`token-burningman: aggregation error: ${err}\n`);
 }
