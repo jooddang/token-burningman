@@ -1,6 +1,6 @@
 {
   "name": "token-burningman",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Token usage analytics for Claude Code and Codex with TUI, statusline, MCP, and opt-in community reporting. Local-first. Privacy-safe.",
   "author": {
     "name": "jooddang",
@@ -21,6 +21,5 @@
   ],
   "commands": "./commands/",
   "skills": "./skills/",
-  "mcpServers": "./.mcp.json",
-  "hooks": "./hooks/hooks.json"
+  "mcpServers": "./.mcp.json"
 }

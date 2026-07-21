@@ -44,6 +44,16 @@ const claudeMarketplaceEntry = claudeMarketplace.plugins.find(
 const codexPlugin = readJson(".codex-plugin/plugin.json");
 const codexPluginMirror = readJson("plugins/token-burningman/.codex-plugin/plugin.json");
 
+assert.equal(
+  claudePlugin.hooks,
+  undefined,
+  "Claude plugin manifest must not re-register the auto-loaded hooks/hooks.json file",
+);
+assert.ok(
+  fs.existsSync(path.join(root, "hooks", "hooks.json")),
+  "Claude plugin hooks/hooks.json is missing",
+);
+
 for (const executable of ["burningman", "burningman-codex-import", "burningman-mcp"]) {
   const target = packageJson.bin?.[executable];
   assert.ok(target, `package.json is missing the ${executable} bin entry`);

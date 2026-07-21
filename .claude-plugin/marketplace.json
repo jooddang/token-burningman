@@ -8,7 +8,7 @@
     {
       "name": "token-burningman",
       "description": "Track Claude Code and Codex usage with local collection, hourly aggregation, native MCP summaries, and a full TUI dashboard.",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "author": {
         "name": "jooddang",
         "email": "gm@sfvibe.fun"
@@ -34,7 +34,7 @@
     }
   ],
   "metadata": {
-    "version": "0.2.0",
+    "version": "0.2.1",
     "description": "Claude Code and Codex usage analytics plugin with local-first collection, native MCP dashboards, and a full Ink TUI."
   }
 }

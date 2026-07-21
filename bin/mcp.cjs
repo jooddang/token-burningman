@@ -25024,7 +25024,7 @@ function registerTools(server) {
 }
 
 // src/version.ts
-var APP_VERSION = "0.2.0";
+var APP_VERSION = "0.2.1";
 
 // src/mcp/server.ts
 async function main() {
