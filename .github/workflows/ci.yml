@@ -11,7 +11,9 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [20, 22]
+        # pnpm 11 (packageManager) requires Node >= 22.13; runtime bundles
+        # still target node20 via tsup.
+        node-version: [22, 24]
 
     steps:
       - uses: actions/checkout@v4
@@ -41,7 +43,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
