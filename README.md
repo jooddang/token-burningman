@@ -350,6 +350,8 @@ npm run build  # Production build
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
+Maintainers: follow [docs/RELEASING.md](docs/RELEASING.md) to version and publish the Claude Code marketplace, Codex marketplace, and npm-backed Codex MCP runtime together.
+
 ## Security
 
 See [SECURITY.md](SECURITY.md) for vulnerability reporting.

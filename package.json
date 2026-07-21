@@ -5,14 +5,14 @@
   "type": "module",
   "packageManager": "pnpm@11.13.1",
   "bin": {
-    "burningman": "./bin/tui.js",
-    "token-burningman": "./bin/tui.js",
-    "burningman-statusline": "./bin/collector.cjs",
-    "token-burningman-statusline": "./bin/collector.cjs",
-    "burningman-codex-import": "./bin/codex-import.cjs",
-    "token-burningman-codex-import": "./bin/codex-import.cjs",
-    "burningman-mcp": "./bin/mcp.cjs",
-    "token-burningman-mcp": "./bin/mcp.cjs"
+    "burningman": "bin/tui.js",
+    "token-burningman": "bin/tui.js",
+    "burningman-statusline": "bin/collector.cjs",
+    "token-burningman-statusline": "bin/collector.cjs",
+    "burningman-codex-import": "bin/codex-import.cjs",
+    "token-burningman-codex-import": "bin/codex-import.cjs",
+    "burningman-mcp": "bin/mcp.cjs",
+    "token-burningman-mcp": "bin/mcp.cjs"
   },
   "files": [
     "bin/",
@@ -29,7 +29,11 @@
   "scripts": {
     "build": "node -e \"require('node:fs').rmSync('bin', { recursive: true, force: true })\" && tsup && node scripts/sync-codex-plugin.cjs",
     "dev": "tsup --watch",
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "release:bump": "node scripts/bump-version.cjs",
+    "release:check": "pnpm run build && pnpm run typecheck && pnpm run test && node scripts/check-release.cjs",
+    "prepublishOnly": "pnpm run release:check"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.28.0",
@@ -50,7 +54,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/jooddang/token-burningman.git"
+    "url": "git+https://github.com/jooddang/token-burningman.git"
   },
   "homepage": "https://github.com/jooddang/token-burningman#readme",
   "bugs": {

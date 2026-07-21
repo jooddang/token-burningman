@@ -71,6 +71,10 @@ fix: prevent race condition in hourly aggregation
 docs: update README with MCP configuration
 ```
 
+## Releases
+
+Maintainers should follow [docs/RELEASING.md](docs/RELEASING.md). Claude Code and Codex use different runtime delivery paths, so a GitHub push or an npm publish by itself is not a complete release.
+
 ## License
 
 By contributing, you agree that your contributions will be licensed under the [FSL-1.1-MIT](LICENSE) license.
