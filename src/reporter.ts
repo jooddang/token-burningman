@@ -9,6 +9,8 @@ import {
   getConfigPath,
   getHourlyDir,
   getStorageDir,
+  acquireLock,
+  releaseLock,
 } from "./utils/storage.js";
 
 interface ReportEntry {
@@ -25,6 +27,19 @@ interface ReportEntry {
   avg_session_duration_min: number;
   cost_usd: number;
 }
+
+interface ReportBatch {
+  entries: ReportEntry[];
+  lastHour: string;
+}
+
+interface ReportBatchPlan {
+  batches: ReportBatch[];
+  blockedByOversizedHour: boolean;
+}
+
+const REPORT_BATCH_TARGET = 100;
+const MAX_REPORTS_PER_HOUR = 500;
 
 /**
  * Build report entries from unreported hourly data.
@@ -67,27 +82,67 @@ function buildReportEntries(lastReportedHour: string | null): ReportEntry[] {
     }
   }
 
-  return entries;
+  return entries.sort((a, b) => {
+    const hourOrder = a.hour.localeCompare(b.hour);
+    return hourOrder !== 0 ? hourOrder : a.model.localeCompare(b.model);
+  });
 }
 
 /**
- * Submit hourly report batch to the community server.
+ * Pack complete hours into bounded requests. The target is soft because a
+ * single hour must remain intact for the hour-based reporting checkpoint.
  */
-export async function submitPublicReport(config: Config): Promise<boolean> {
-  const cliToken = config.publicReporting?.cliToken;
-  if (!cliToken) return false; // Not logged in — skip reporting
+function buildReportBatches(entries: ReportEntry[]): ReportBatchPlan {
+  const hourGroups: ReportEntry[][] = [];
 
-  const serverUrl = config.publicReporting.serverUrl || "https://sfvibe.fun/api/burningman";
+  for (const entry of entries) {
+    const current = hourGroups[hourGroups.length - 1];
+    if (!current || current[0].hour !== entry.hour) {
+      hourGroups.push([entry]);
+    } else {
+      current.push(entry);
+    }
+  }
 
-  // Read last reported hour
-  const statePath = path.join(getStorageDir(), ".report-state.json");
-  const state = readJson<{ lastReportedHour: string | null }>(statePath, {
-    lastReportedHour: null,
-  });
+  const batches: ReportBatch[] = [];
+  let currentEntries: ReportEntry[] = [];
 
-  const entries = buildReportEntries(state.lastReportedHour);
-  if (entries.length === 0) return true; // nothing new
+  const flush = (): void => {
+    if (currentEntries.length === 0) return;
+    batches.push({
+      entries: currentEntries,
+      lastHour: currentEntries[currentEntries.length - 1].hour,
+    });
+    currentEntries = [];
+  };
 
+  for (const group of hourGroups) {
+    if (group.length > MAX_REPORTS_PER_HOUR) {
+      flush();
+      return { batches, blockedByOversizedHour: true };
+    }
+
+    if (currentEntries.length > 0 && currentEntries.length + group.length > REPORT_BATCH_TARGET) {
+      flush();
+    }
+
+    if (group.length > REPORT_BATCH_TARGET) {
+      currentEntries = group;
+      flush();
+    } else {
+      currentEntries.push(...group);
+    }
+  }
+
+  flush();
+  return { batches, blockedByOversizedHour: false };
+}
+
+async function submitReportBatch(
+  config: Config,
+  serverUrl: string,
+  entries: ReportEntry[],
+): Promise<boolean> {
   const body = JSON.stringify({
     v: 1,
     reports: entries,
@@ -105,25 +160,18 @@ export async function submitPublicReport(config: Config): Promise<boolean> {
         headers: {
           "Content-Type": "application/json",
           "Content-Length": Buffer.byteLength(body),
-          "Authorization": `Bearer ${cliToken}`,
+          "Authorization": `Bearer ${config.publicReporting.cliToken}`,
         },
         rejectUnauthorized: true,
         timeout: 10000,
       },
       (res) => {
-        let data = "";
-        res.on("data", (chunk: Buffer) => { data += chunk.toString(); });
+        res.on("aborted", () => resolve(false));
+        res.on("error", () => resolve(false));
         res.on("end", () => {
           if (res.statusCode === 200) {
-            // Update last reported hour
-            const lastHour = entries.reduce(
-              (max, e) => (e.hour > max ? e.hour : max),
-              entries[0].hour,
-            );
-            writeJsonAtomic(statePath, { lastReportedHour: lastHour });
             resolve(true);
           } else if (res.statusCode === 401) {
-            // Token expired or revoked — clear it
             config.publicReporting.cliToken = null;
             writeJsonAtomic(getConfigPath(), config);
             resolve(false);
@@ -131,6 +179,7 @@ export async function submitPublicReport(config: Config): Promise<boolean> {
             resolve(false);
           }
         });
+        res.resume();
       },
     );
     req.on("error", () => resolve(false));
@@ -138,4 +187,41 @@ export async function submitPublicReport(config: Config): Promise<boolean> {
     req.write(body);
     req.end();
   });
+}
+
+/**
+ * Submit hourly report batch to the community server.
+ */
+export async function submitPublicReport(config: Config): Promise<boolean> {
+  const cliToken = config.publicReporting?.cliToken;
+  if (!cliToken) return false; // Not logged in — skip reporting
+
+  const reportLockPath = path.join(getStorageDir(), ".report.lock");
+  const reportLockFd = acquireLock(reportLockPath);
+  if (reportLockFd === null) return false;
+
+  try {
+    const serverUrl = config.publicReporting.serverUrl || "https://sfvibe.fun/api/burningman";
+
+    // Read last reported hour only after acquiring the cross-process report lock.
+    const statePath = path.join(getStorageDir(), ".report-state.json");
+    const state = readJson<{ lastReportedHour: string | null }>(statePath, {
+      lastReportedHour: null,
+    });
+
+    const entries = buildReportEntries(state.lastReportedHour);
+    if (entries.length === 0) return true; // nothing new
+
+    const plan = buildReportBatches(entries);
+
+    for (const batch of plan.batches) {
+      const submitted = await submitReportBatch(config, serverUrl, batch.entries);
+      if (!submitted) return false;
+      writeJsonAtomic(statePath, { lastReportedHour: batch.lastHour });
+    }
+
+    return !plan.blockedByOversizedHour;
+  } finally {
+    releaseLock(reportLockPath, reportLockFd);
+  }
 }

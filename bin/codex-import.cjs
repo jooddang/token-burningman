@@ -177,6 +177,34 @@ function sessionIdFromPath(filePath) {
   return path.basename(filePath, ".jsonl");
 }
 var DEFAULT_LOCK_STALE_MS = 15 * 6e4;
+function acquireLock(lockPath, staleMs = DEFAULT_LOCK_STALE_MS) {
+  ensureDir(path.dirname(lockPath));
+  try {
+    return fs.openSync(lockPath, "wx", 384);
+  } catch {
+    try {
+      const stat = fs.statSync(lockPath);
+      if (Date.now() - stat.mtimeMs > staleMs) {
+        fs.unlinkSync(lockPath);
+        return fs.openSync(lockPath, "wx", 384);
+      }
+    } catch {
+    }
+    return null;
+  }
+}
+function releaseLock(lockPath, fd) {
+  if (fd !== null) {
+    try {
+      fs.closeSync(fd);
+    } catch {
+    }
+  }
+  try {
+    fs.unlinkSync(lockPath);
+  } catch {
+  }
+}
 
 // src/aggregator.ts
 function newBucket() {
@@ -269,6 +297,8 @@ var https = __toESM(require("https"), 1);
 var http = __toESM(require("http"), 1);
 var fs2 = __toESM(require("fs"), 1);
 var path2 = __toESM(require("path"), 1);
+var REPORT_BATCH_TARGET = 100;
+var MAX_REPORTS_PER_HOUR = 500;
 function buildReportEntries(lastReportedHour) {
   const hourlyDir = getHourlyDir();
   if (!fs2.existsSync(hourlyDir)) return [];
@@ -302,18 +332,50 @@ function buildReportEntries(lastReportedHour) {
       }
     }
   }
-  return entries;
-}
-async function submitPublicReport(config) {
-  const cliToken = config.publicReporting?.cliToken;
-  if (!cliToken) return false;
-  const serverUrl = config.publicReporting.serverUrl || "https://sfvibe.fun/api/burningman";
-  const statePath = path2.join(getStorageDir(), ".report-state.json");
-  const state = readJson(statePath, {
-    lastReportedHour: null
+  return entries.sort((a, b) => {
+    const hourOrder = a.hour.localeCompare(b.hour);
+    return hourOrder !== 0 ? hourOrder : a.model.localeCompare(b.model);
   });
-  const entries = buildReportEntries(state.lastReportedHour);
-  if (entries.length === 0) return true;
+}
+function buildReportBatches(entries) {
+  const hourGroups = [];
+  for (const entry of entries) {
+    const current = hourGroups[hourGroups.length - 1];
+    if (!current || current[0].hour !== entry.hour) {
+      hourGroups.push([entry]);
+    } else {
+      current.push(entry);
+    }
+  }
+  const batches = [];
+  let currentEntries = [];
+  const flush = () => {
+    if (currentEntries.length === 0) return;
+    batches.push({
+      entries: currentEntries,
+      lastHour: currentEntries[currentEntries.length - 1].hour
+    });
+    currentEntries = [];
+  };
+  for (const group of hourGroups) {
+    if (group.length > MAX_REPORTS_PER_HOUR) {
+      flush();
+      return { batches, blockedByOversizedHour: true };
+    }
+    if (currentEntries.length > 0 && currentEntries.length + group.length > REPORT_BATCH_TARGET) {
+      flush();
+    }
+    if (group.length > REPORT_BATCH_TARGET) {
+      currentEntries = group;
+      flush();
+    } else {
+      currentEntries.push(...group);
+    }
+  }
+  flush();
+  return { batches, blockedByOversizedHour: false };
+}
+async function submitReportBatch(config, serverUrl, entries) {
   const body = JSON.stringify({
     v: 1,
     reports: entries
@@ -330,23 +392,16 @@ async function submitPublicReport(config) {
         headers: {
           "Content-Type": "application/json",
           "Content-Length": Buffer.byteLength(body),
-          "Authorization": `Bearer ${cliToken}`
+          "Authorization": `Bearer ${config.publicReporting.cliToken}`
         },
         rejectUnauthorized: true,
         timeout: 1e4
       },
       (res) => {
-        let data = "";
-        res.on("data", (chunk) => {
-          data += chunk.toString();
-        });
+        res.on("aborted", () => resolve(false));
+        res.on("error", () => resolve(false));
         res.on("end", () => {
           if (res.statusCode === 200) {
-            const lastHour = entries.reduce(
-              (max, e) => e.hour > max ? e.hour : max,
-              entries[0].hour
-            );
-            writeJsonAtomic(statePath, { lastReportedHour: lastHour });
             resolve(true);
           } else if (res.statusCode === 401) {
             config.publicReporting.cliToken = null;
@@ -356,6 +411,7 @@ async function submitPublicReport(config) {
             resolve(false);
           }
         });
+        res.resume();
       }
     );
     req.on("error", () => resolve(false));
@@ -366,6 +422,31 @@ async function submitPublicReport(config) {
     req.write(body);
     req.end();
   });
+}
+async function submitPublicReport(config) {
+  const cliToken = config.publicReporting?.cliToken;
+  if (!cliToken) return false;
+  const reportLockPath = path2.join(getStorageDir(), ".report.lock");
+  const reportLockFd = acquireLock(reportLockPath);
+  if (reportLockFd === null) return false;
+  try {
+    const serverUrl = config.publicReporting.serverUrl || "https://sfvibe.fun/api/burningman";
+    const statePath = path2.join(getStorageDir(), ".report-state.json");
+    const state = readJson(statePath, {
+      lastReportedHour: null
+    });
+    const entries = buildReportEntries(state.lastReportedHour);
+    if (entries.length === 0) return true;
+    const plan = buildReportBatches(entries);
+    for (const batch of plan.batches) {
+      const submitted = await submitReportBatch(config, serverUrl, batch.entries);
+      if (!submitted) return false;
+      writeJsonAtomic(statePath, { lastReportedHour: batch.lastHour });
+    }
+    return !plan.blockedByOversizedHour;
+  } finally {
+    releaseLock(reportLockPath, reportLockFd);
+  }
 }
 
 // src/types.ts

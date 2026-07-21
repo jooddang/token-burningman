@@ -16,7 +16,7 @@ Start from an up-to-date clean `master` branch on Node 22.13 or newer (required 
 ```bash
 git pull --ff-only origin master
 npm view token-burningman versions --json
-pnpm run release:bump 0.1.13
+pnpm run release:bump 0.2.0
 ```
 
 `release:bump` updates the canonical package version plus the Claude Code and Codex manifests. Do not edit the generated `plugins/token-burningman/` mirror by hand.
@@ -49,13 +49,13 @@ Treat every `npm warn publish ... corrected` message as a release blocker. In pa
 Commit the version, generated bundles, manifests, and release documentation together, then push and wait for CI:
 
 ```bash
-git add package.json .claude-plugin .codex-plugin .agents plugins bin docs scripts
-git commit -m "chore: release 0.1.13"
+git add package.json README.md src tests .claude-plugin .codex-plugin .agents plugins bin docs scripts
+git commit -m "chore: release 0.2.0"
 git push origin master
 RUN_ID=$(gh run list --repo jooddang/token-burningman --commit "$(git rev-parse HEAD)" --limit 1 --json databaseId --jq '.[0].databaseId')
 gh run watch "$RUN_ID" --repo jooddang/token-burningman --exit-status
-git tag v0.1.13
-git push origin v0.1.13
+git tag v0.2.0
+git push origin v0.2.0
 ```
 
 A GitHub Release page is optional; the marketplaces consume the repository and tag, not a GitHub Release asset.
@@ -79,11 +79,11 @@ Registry propagation can take a short time. Verify the dist-tag and execute the 
 npm view token-burningman version dist-tags --json
 SMOKE_DIR=$(mktemp -d)
 (cd "$SMOKE_DIR" && printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"release-smoke","version":"1"}}}' \
-  | npx -y --package=token-burningman@0.1.13 burningman-mcp)
+  | npx -y --package=token-burningman@0.2.0 burningman-mcp)
 rmdir "$SMOKE_DIR"
 ```
 
-The response's `result.serverInfo.version` must be `0.1.13`.
+The response's `result.serverInfo.version` must be `0.2.0`.
 
 Then test the client update paths:
 
@@ -99,6 +99,12 @@ codex plugin add token-burningman@token-burningman
 ```
 
 Claude Code may use `/reload-plugins` instead of a full restart. Codex should be restarted after the marketplace upgrade and plugin add so its skills and bundled MCP server are reloaded.
+
+## 0.2.0 reporting change
+
+`0.2.0` sends pending community reports as sequential, complete-hour batches instead of one unbounded request. The client targets 100 entries per request, never sends more than the server's 500-entry limit for one hour, and checkpoints after every accepted batch. A later HTTP, network, or authentication failure therefore preserves earlier progress and resumes from the last completed hour on the next sync.
+
+Reporting is protected by a cross-process lock so Codex imports, MCP tools, and background maintenance cannot race the shared checkpoint. This release changes only the token-burningman client; it does not require a corresponding sfvibe server deployment.
 
 ## 0.1.12 corrective follow-up
 
