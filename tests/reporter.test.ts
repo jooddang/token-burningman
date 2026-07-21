@@ -3,7 +3,7 @@ import * as http from "node:http";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { submitPublicReport } from "../src/reporter.js";
+import { saturateReportMetric, submitPublicReport } from "../src/reporter.js";
 import type { Config, HourlyAggregate, HourlyBucket } from "../src/types.js";
 import { DEFAULT_CONFIG } from "../src/types.js";
 import {
@@ -17,7 +17,20 @@ import {
 
 interface CapturedBatch {
   v: number;
-  reports: Array<{ hour: string; model: string }>;
+  reports: Array<{
+    hour: string;
+    model: string;
+    input_tokens: number;
+    output_tokens: number;
+    cache_read_tokens: number;
+    cache_create_tokens: number;
+    concurrent_sessions: number;
+    avg_context_pct: number;
+    total_lines_changed: number;
+    session_count: number;
+    avg_session_duration_min: number;
+    cost_usd: number;
+  }>;
 }
 
 function makeBucket(seed: number): HourlyBucket {
@@ -334,5 +347,120 @@ describe("community report batching", () => {
     expect(fs.existsSync(configPath)).toBe(true);
     expect(readJson<Config>(configPath, DEFAULT_CONFIG)
       .publicReporting.cliToken).toBeNull();
+  });
+
+  it("saturates community payload metrics at the server contract limits", async () => {
+    const oversizedBucket: HourlyBucket = {
+      input: 50_000_001,
+      output: 50_000_002,
+      cacheRead: 100_000_001,
+      cacheCreate: 100_000_002,
+      cost: 10_000.01,
+      requests: 1,
+      linesAdded: 1_000_001,
+      linesRemoved: 1_000_001,
+      sessions: Array.from({ length: 101 }, (_, index) => `session-${index}`),
+      avgContextPct: 101,
+    };
+    const lowerBoundBucket: HourlyBucket = {
+      input: -1.2,
+      output: 42.9,
+      cacheRead: -3,
+      cacheCreate: 5.9,
+      cost: -1,
+      requests: 1,
+      linesAdded: 10.9,
+      linesRemoved: 0,
+      sessions: ["session-lower-bound"],
+      avgContextPct: -0.5,
+    };
+    const originalHourly: HourlyAggregate = {
+      "0": {
+        "model-a": oversizedBucket,
+        "model-b": lowerBoundBucket,
+      },
+    };
+    writeHourly(originalHourly);
+    const reportServer = await startReportServer((_requestNumber, batch) => {
+      const withinContract = batch.reports.every((report) =>
+        Number.isInteger(report.input_tokens) &&
+        report.input_tokens >= 0 && report.input_tokens <= 50_000_000 &&
+        Number.isInteger(report.output_tokens) &&
+        report.output_tokens >= 0 && report.output_tokens <= 50_000_000 &&
+        Number.isInteger(report.cache_read_tokens) &&
+        report.cache_read_tokens >= 0 && report.cache_read_tokens <= 100_000_000 &&
+        Number.isInteger(report.cache_create_tokens) &&
+        report.cache_create_tokens >= 0 && report.cache_create_tokens <= 100_000_000 &&
+        Number.isInteger(report.concurrent_sessions) &&
+        report.concurrent_sessions >= 0 && report.concurrent_sessions <= 50 &&
+        Number.isFinite(report.avg_context_pct) &&
+        report.avg_context_pct >= 0 && report.avg_context_pct <= 100 &&
+        Number.isInteger(report.total_lines_changed) &&
+        report.total_lines_changed >= 0 && report.total_lines_changed <= 1_000_000 &&
+        Number.isInteger(report.session_count) &&
+        report.session_count >= 0 && report.session_count <= 100 &&
+        Number.isFinite(report.avg_session_duration_min) &&
+        report.avg_session_duration_min >= 0 && report.avg_session_duration_min <= 1440 &&
+        Number.isFinite(report.cost_usd) &&
+        report.cost_usd >= 0 && report.cost_usd <= 10_000,
+      );
+      return { status: withinContract ? 200 : 400 };
+    });
+    servers.push(reportServer);
+
+    expect(await submitPublicReport(configFor(reportServer.serverUrl))).toBe(true);
+    const reportsByModel = Object.fromEntries(
+      reportServer.batches[0].reports.map((report) => [report.model, report]),
+    );
+    expect(reportsByModel["model-a"]).toMatchObject({
+      input_tokens: 50_000_000,
+      output_tokens: 50_000_000,
+      cache_read_tokens: 100_000_000,
+      cache_create_tokens: 100_000_000,
+      concurrent_sessions: 50,
+      avg_context_pct: 100,
+      total_lines_changed: 1_000_000,
+      session_count: 100,
+      avg_session_duration_min: 0,
+      cost_usd: 10_000,
+    });
+    expect(reportsByModel["model-b"]).toMatchObject({
+      input_tokens: 0,
+      output_tokens: 42,
+      cache_read_tokens: 0,
+      cache_create_tokens: 5,
+      concurrent_sessions: 1,
+      avg_context_pct: 0,
+      total_lines_changed: 10,
+      session_count: 1,
+      avg_session_duration_min: 0,
+      cost_usd: 0,
+    });
+    expect(readJson<HourlyAggregate>(getHourlyFilePath("2026-01-01"), {}))
+      .toEqual(originalHourly);
+    expect(readCheckpoint()).toBe("2026-01-01T00:00:00Z");
+  });
+
+  it.each([null, "100", Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(
+    "rejects invalid runtime metric %s instead of silently reporting zero",
+    (invalidValue) => {
+      expect(() => saturateReportMetric(invalidValue, 100, true)).toThrow(TypeError);
+    },
+  );
+
+  it("does not send or checkpoint a persisted report with an invalid metric type", async () => {
+    const invalidBucket = {
+      ...makeBucket(1),
+      input: null,
+    } as unknown as HourlyBucket;
+    writeHourly({ "0": { "model-invalid": invalidBucket } });
+    const reportServer = await startReportServer(() => ({ status: 200 }));
+    servers.push(reportServer);
+
+    expect(await submitPublicReport(configFor(reportServer.serverUrl))).toBe(false);
+    expect(reportServer.batches).toHaveLength(0);
+    expect(readCheckpoint()).toBeNull();
+    expect(readJson<HourlyAggregate>(getHourlyFilePath("2026-01-01"), {}))
+      .toEqual({ "0": { "model-invalid": invalidBucket } });
   });
 });

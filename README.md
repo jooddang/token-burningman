@@ -322,6 +322,7 @@ repo root/
 - All data is stored locally in `~/.token-burningman/` with restricted file permissions (`0600`/`0700`).
 - Community reporting is **opt-in** and shares only hourly-bucketed aggregates.
 - Pending reports are sent in bounded, complete-hour batches. Each successful batch advances a local checkpoint so interrupted syncs resume without dropping an hour.
+- Local analytics retain exact values. The anonymous community payload alone is saturated at the public reporting protocol's per-field safety limits when an hourly model total exceeds them.
 - No project names, file contents, session IDs, or fine-grained timestamps are ever transmitted.
 - All network requests use HTTPS with certificate validation enforced.
 

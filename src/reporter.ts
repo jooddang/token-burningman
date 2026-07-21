@@ -40,6 +40,32 @@ interface ReportBatchPlan {
 
 const REPORT_BATCH_TARGET = 100;
 const MAX_REPORTS_PER_HOUR = 500;
+const REPORT_FIELD_LIMITS = {
+  inputTokens: 50_000_000,
+  outputTokens: 50_000_000,
+  cacheReadTokens: 100_000_000,
+  cacheCreateTokens: 100_000_000,
+  concurrentSessions: 50,
+  avgContextPct: 100,
+  totalLinesChanged: 1_000_000,
+  sessionCount: 100,
+  avgSessionDurationMin: 1440,
+  costUsd: 10_000,
+} as const;
+
+/**
+ * Keep the community wire payload within the v1 report contract. Local
+ * aggregates remain exact; only the anonymous public representation is
+ * saturated because the server stores one row per user/hour/model and cannot
+ * losslessly accept split values for a single row.
+ */
+export function saturateReportMetric(value: unknown, max: number, integer = false): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new TypeError("Community report metrics must be finite numbers");
+  }
+  const boundedValue = Math.min(Math.max(value, 0), max);
+  return integer ? Math.trunc(boundedValue) : boundedValue;
+}
 
 /**
  * Build report entries from unreported hourly data.
@@ -64,19 +90,68 @@ function buildReportEntries(lastReportedHour: string | null): ReportEntry[] {
       if (lastReportedHour && hourIso <= lastReportedHour) continue;
 
       for (const [model, bucket] of Object.entries(models) as [string, HourlyBucket][]) {
+        if (!Array.isArray(bucket.sessions)) {
+          throw new TypeError("Community report sessions must be an array");
+        }
+        const linesChanged =
+          saturateReportMetric(bucket.linesAdded, Number.MAX_SAFE_INTEGER) +
+          saturateReportMetric(bucket.linesRemoved, Number.MAX_SAFE_INTEGER);
+        const avgContextPct = saturateReportMetric(
+          bucket.avgContextPct,
+          Number.MAX_SAFE_INTEGER,
+        );
+        const costUsd = saturateReportMetric(bucket.cost, Number.MAX_SAFE_INTEGER);
+
         entries.push({
           hour: hourIso,
           model,
-          input_tokens: bucket.input,
-          output_tokens: bucket.output,
-          cache_read_tokens: bucket.cacheRead,
-          cache_create_tokens: bucket.cacheCreate,
-          concurrent_sessions: bucket.sessions.length,
-          avg_context_pct: Math.round(bucket.avgContextPct),
-          total_lines_changed: bucket.linesAdded + bucket.linesRemoved,
-          session_count: bucket.sessions.length,
-          avg_session_duration_min: 0, // not tracked at hourly level yet
-          cost_usd: Math.round(bucket.cost * 100) / 100,
+          input_tokens: saturateReportMetric(
+            bucket.input,
+            REPORT_FIELD_LIMITS.inputTokens,
+            true,
+          ),
+          output_tokens: saturateReportMetric(
+            bucket.output,
+            REPORT_FIELD_LIMITS.outputTokens,
+            true,
+          ),
+          cache_read_tokens: saturateReportMetric(
+            bucket.cacheRead,
+            REPORT_FIELD_LIMITS.cacheReadTokens,
+            true,
+          ),
+          cache_create_tokens: saturateReportMetric(
+            bucket.cacheCreate,
+            REPORT_FIELD_LIMITS.cacheCreateTokens,
+            true,
+          ),
+          concurrent_sessions: saturateReportMetric(
+            bucket.sessions.length,
+            REPORT_FIELD_LIMITS.concurrentSessions,
+            true,
+          ),
+          avg_context_pct: saturateReportMetric(
+            Math.round(avgContextPct),
+            REPORT_FIELD_LIMITS.avgContextPct,
+          ),
+          total_lines_changed: saturateReportMetric(
+            linesChanged,
+            REPORT_FIELD_LIMITS.totalLinesChanged,
+            true,
+          ),
+          session_count: saturateReportMetric(
+            bucket.sessions.length,
+            REPORT_FIELD_LIMITS.sessionCount,
+            true,
+          ),
+          avg_session_duration_min: saturateReportMetric(
+            0, // not tracked at hourly level yet
+            REPORT_FIELD_LIMITS.avgSessionDurationMin,
+          ),
+          cost_usd: saturateReportMetric(
+            Math.round(costUsd * 100) / 100,
+            REPORT_FIELD_LIMITS.costUsd,
+          ),
         });
       }
     }
@@ -209,7 +284,12 @@ export async function submitPublicReport(config: Config): Promise<boolean> {
       lastReportedHour: null,
     });
 
-    const entries = buildReportEntries(state.lastReportedHour);
+    let entries: ReportEntry[];
+    try {
+      entries = buildReportEntries(state.lastReportedHour);
+    } catch {
+      return false;
+    }
     if (entries.length === 0) return true; // nothing new
 
     const plan = buildReportBatches(entries);

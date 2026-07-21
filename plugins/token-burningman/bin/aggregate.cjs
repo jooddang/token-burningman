@@ -281,6 +281,25 @@ var fs2 = __toESM(require("fs"), 1);
 var path2 = __toESM(require("path"), 1);
 var REPORT_BATCH_TARGET = 100;
 var MAX_REPORTS_PER_HOUR = 500;
+var REPORT_FIELD_LIMITS = {
+  inputTokens: 5e7,
+  outputTokens: 5e7,
+  cacheReadTokens: 1e8,
+  cacheCreateTokens: 1e8,
+  concurrentSessions: 50,
+  avgContextPct: 100,
+  totalLinesChanged: 1e6,
+  sessionCount: 100,
+  avgSessionDurationMin: 1440,
+  costUsd: 1e4
+};
+function saturateReportMetric(value, max, integer = false) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new TypeError("Community report metrics must be finite numbers");
+  }
+  const boundedValue = Math.min(Math.max(value, 0), max);
+  return integer ? Math.trunc(boundedValue) : boundedValue;
+}
 function buildReportEntries(lastReportedHour) {
   const hourlyDir = getHourlyDir();
   if (!fs2.existsSync(hourlyDir)) return [];
@@ -296,20 +315,66 @@ function buildReportEntries(lastReportedHour) {
       const hourIso = `${dateStr}T${hourStr.padStart(2, "0")}:00:00Z`;
       if (lastReportedHour && hourIso <= lastReportedHour) continue;
       for (const [model, bucket] of Object.entries(models)) {
+        if (!Array.isArray(bucket.sessions)) {
+          throw new TypeError("Community report sessions must be an array");
+        }
+        const linesChanged = saturateReportMetric(bucket.linesAdded, Number.MAX_SAFE_INTEGER) + saturateReportMetric(bucket.linesRemoved, Number.MAX_SAFE_INTEGER);
+        const avgContextPct = saturateReportMetric(
+          bucket.avgContextPct,
+          Number.MAX_SAFE_INTEGER
+        );
+        const costUsd = saturateReportMetric(bucket.cost, Number.MAX_SAFE_INTEGER);
         entries.push({
           hour: hourIso,
           model,
-          input_tokens: bucket.input,
-          output_tokens: bucket.output,
-          cache_read_tokens: bucket.cacheRead,
-          cache_create_tokens: bucket.cacheCreate,
-          concurrent_sessions: bucket.sessions.length,
-          avg_context_pct: Math.round(bucket.avgContextPct),
-          total_lines_changed: bucket.linesAdded + bucket.linesRemoved,
-          session_count: bucket.sessions.length,
-          avg_session_duration_min: 0,
-          // not tracked at hourly level yet
-          cost_usd: Math.round(bucket.cost * 100) / 100
+          input_tokens: saturateReportMetric(
+            bucket.input,
+            REPORT_FIELD_LIMITS.inputTokens,
+            true
+          ),
+          output_tokens: saturateReportMetric(
+            bucket.output,
+            REPORT_FIELD_LIMITS.outputTokens,
+            true
+          ),
+          cache_read_tokens: saturateReportMetric(
+            bucket.cacheRead,
+            REPORT_FIELD_LIMITS.cacheReadTokens,
+            true
+          ),
+          cache_create_tokens: saturateReportMetric(
+            bucket.cacheCreate,
+            REPORT_FIELD_LIMITS.cacheCreateTokens,
+            true
+          ),
+          concurrent_sessions: saturateReportMetric(
+            bucket.sessions.length,
+            REPORT_FIELD_LIMITS.concurrentSessions,
+            true
+          ),
+          avg_context_pct: saturateReportMetric(
+            Math.round(avgContextPct),
+            REPORT_FIELD_LIMITS.avgContextPct
+          ),
+          total_lines_changed: saturateReportMetric(
+            linesChanged,
+            REPORT_FIELD_LIMITS.totalLinesChanged,
+            true
+          ),
+          session_count: saturateReportMetric(
+            bucket.sessions.length,
+            REPORT_FIELD_LIMITS.sessionCount,
+            true
+          ),
+          avg_session_duration_min: saturateReportMetric(
+            0,
+            // not tracked at hourly level yet
+            REPORT_FIELD_LIMITS.avgSessionDurationMin
+          ),
+          cost_usd: saturateReportMetric(
+            Math.round(costUsd * 100) / 100,
+            REPORT_FIELD_LIMITS.costUsd
+          )
         });
       }
     }
@@ -417,7 +482,12 @@ async function submitPublicReport(config) {
     const state = readJson(statePath, {
       lastReportedHour: null
     });
-    const entries = buildReportEntries(state.lastReportedHour);
+    let entries;
+    try {
+      entries = buildReportEntries(state.lastReportedHour);
+    } catch {
+      return false;
+    }
     if (entries.length === 0) return true;
     const plan = buildReportBatches(entries);
     for (const batch of plan.batches) {
