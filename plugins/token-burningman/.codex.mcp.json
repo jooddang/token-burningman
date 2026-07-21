@@ -1,8 +1,9 @@
 {
   "mcpServers": {
     "token-burningman": {
-      "command": "npx",
-      "args": ["-y", "--package=token-burningman", "burningman-mcp"]
+      "command": "node",
+      "args": ["./bin/mcp.cjs"],
+      "cwd": "."
     }
   }
 }

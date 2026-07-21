@@ -67,6 +67,17 @@ assert.deepEqual(
   readJson(".codex.mcp.json"),
   "Codex MCP mirror is stale; run pnpm run build",
 );
+
+const codexMcp = readJson(".codex.mcp.json").mcpServers?.["token-burningman"];
+assert.deepEqual(
+  codexMcp,
+  {
+    command: "node",
+    args: ["./bin/mcp.cjs"],
+    cwd: ".",
+  },
+  "Codex MCP must launch the bundled plugin binary directly from the plugin root",
+);
 assert.deepEqual(
   digestTree("plugins/token-burningman/bin"),
   digestTree("bin"),
@@ -88,8 +99,20 @@ const initialize = JSON.stringify({
     clientInfo: { name: "release-check", version: "1" },
   },
 });
-const mcp = spawnSync(process.execPath, [path.join(root, "bin/mcp.cjs")], {
-  input: `${initialize}\n`,
+const initialized = JSON.stringify({
+  jsonrpc: "2.0",
+  method: "notifications/initialized",
+});
+const toolsList = JSON.stringify({
+  jsonrpc: "2.0",
+  id: 2,
+  method: "tools/list",
+  params: {},
+});
+const codexPluginRoot = path.join(root, "plugins", "token-burningman");
+const mcp = spawnSync(codexMcp.command, codexMcp.args, {
+  cwd: path.resolve(codexPluginRoot, codexMcp.cwd),
+  input: `${initialize}\n${initialized}\n${toolsList}\n`,
   encoding: "utf8",
   timeout: 5_000,
 });
@@ -100,6 +123,11 @@ assert.equal(
   response.result?.serverInfo?.version,
   version,
   `MCP server version ${response.result?.serverInfo?.version} does not match package ${version}`,
+);
+const toolsResponse = JSON.parse(mcp.stdout.trim().split("\n")[1]);
+assert.ok(
+  toolsResponse.result?.tools?.some((tool) => tool.name === "get_overview"),
+  "Codex MCP tools/list response is missing get_overview",
 );
 
 console.log(`Release artifacts are consistent at ${version}.`);

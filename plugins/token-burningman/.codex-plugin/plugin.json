@@ -1,6 +1,6 @@
 {
   "name": "token-burningman",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "description": "Token usage analytics for Claude Code and Codex with TUI, MCP, and opt-in sfvibe.fun community reporting.",
   "author": {
     "name": "jooddang",

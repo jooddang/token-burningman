@@ -5,9 +5,9 @@ token-burningman has two delivery paths that must be released together:
 | Consumer | Marketplace metadata and plugin files | Runtime binaries |
 | --- | --- | --- |
 | Claude Code | GitHub `master`: `.claude-plugin/`, `commands/`, `hooks/`, `skills/`, `bin/` | The plugin checkout from GitHub |
-| Codex | GitHub `master`: `.agents/plugins/marketplace.json` and `plugins/token-burningman/` | npm `token-burningman@latest`, launched by `.codex.mcp.json` through `npx` |
+| Codex | GitHub `master`: `.agents/plugins/marketplace.json` and `plugins/token-burningman/` | The bundled `plugins/token-burningman/bin/mcp.cjs`, launched directly by `.codex.mcp.json` |
 
-`npm publish` alone is therefore not a complete release. GitHub serves both marketplaces and the Claude Code runtime, while npm serves the Codex MCP runtime. A release is complete only when the Git commit, marketplace manifests, npm dist-tag, and live MCP version all agree.
+`npm publish` alone is therefore not a complete release. GitHub serves both marketplaces and their plugin checkouts; npm serves the standalone CLI and provides an independent package smoke test. A release is complete only when the Git commit, marketplace manifests, npm dist-tag, and both live MCP launch paths agree.
 
 ## 1. Choose and apply the version
 
@@ -16,7 +16,7 @@ Start from an up-to-date clean `master` branch on Node 22.13 or newer (required 
 ```bash
 git pull --ff-only origin master
 npm view token-burningman versions --json
-pnpm run release:bump -- 0.1.13
+pnpm run release:bump 0.1.13
 ```
 
 `release:bump` updates the canonical package version plus the Claude Code and Codex manifests. Do not edit the generated `plugins/token-burningman/` mirror by hand.
@@ -30,7 +30,7 @@ npm pack --dry-run
 git status --short
 ```
 
-`release:check` rebuilds `bin/`, syncs the Codex plugin mirror, type-checks, runs the test suite, checks every manifest version, compares the mirrored binaries/skills/MCP configuration, and initializes the built MCP server to verify its reported version.
+`release:check` rebuilds `bin/`, syncs the Codex plugin mirror, type-checks, runs the test suite, checks every manifest version, compares the mirrored binaries/skills/MCP configuration, and performs a full initialize/initialized/tools-list handshake through the exact bundled Codex launch configuration.
 
 CI repeats the typecheck and release-artifact verification on Node 22 and Node 24, so version or mirror drift blocks the release branch before publish.
 
@@ -73,12 +73,14 @@ npm publish
 
 ## 5. Verify the live release
 
-Registry propagation can take a short time. Verify the dist-tag and execute the exact published package, not the local checkout:
+Registry propagation can take a short time. Verify the dist-tag and execute the exact published package from outside the repository. Running `npx --package=token-burningman` inside the package's own checkout can make npm reuse the local root package without linking its bin commands.
 
 ```bash
 npm view token-burningman version dist-tags --json
-printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"release-smoke","version":"1"}}}' \
-  | npx -y --package=token-burningman@0.1.13 burningman-mcp
+SMOKE_DIR=$(mktemp -d)
+(cd "$SMOKE_DIR" && printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"release-smoke","version":"1"}}}' \
+  | npx -y --package=token-burningman@0.1.13 burningman-mcp)
+rmdir "$SMOKE_DIR"
 ```
 
 The response's `result.serverInfo.version` must be `0.1.13`.
@@ -90,14 +92,19 @@ Then test the client update paths:
 claude plugin marketplace update jooddang
 claude plugin update token-burningman@jooddang
 
-# Codex CLI, followed by checking Token Burningman in /plugins and restarting Codex
+# Codex CLI: add once, then upgrade on later releases
+codex plugin marketplace add jooddang/token-burningman
 codex plugin marketplace upgrade token-burningman
+codex plugin add token-burningman@token-burningman
 ```
 
-Claude Code may use `/reload-plugins` instead of a full restart. Codex should be restarted after the marketplace upgrade so its skills and npm-backed MCP server are reloaded.
+Claude Code may use `/reload-plugins` instead of a full restart. Codex should be restarted after the marketplace upgrade and plugin add so its skills and bundled MCP server are reloaded.
 
-## Current 0.1.12 catch-up release
+## 0.1.12 corrective follow-up
 
-The `0.1.12` manifests and GitHub `master` state were already pushed and CI passed, but npm still served `0.1.10`. That npm version does not contain the `burningman-mcp` bin entry, so the current Codex MCP launch command fails with `burningman-mcp: command not found`; this is a runtime outage, not just a displayed-version mismatch.
+`0.1.12` restored the missing npm `burningman-mcp` bin, but exposed two release-process assumptions:
 
-For this one-time catch-up, after authenticating to npm, run the verification commands above and publish the existing `0.1.12`. Do not bump again unless npm reports that `0.1.12` already exists. After publishing, the explicit `npx --package=token-burningman@0.1.12 burningman-mcp` smoke test is mandatory.
+- `npx --package=token-burningman` must be tested outside this repository to avoid local-package shadowing.
+- A Codex Git marketplace must be added before it can be upgraded, and a listed plugin must be installed before its MCP is available.
+
+The Codex plugin itself now launches its bundled `bin/mcp.cjs` directly, so its runtime no longer depends on npm resolution or the directory from which Codex was started. This Codex-only wiring change does not alter Claude Code's plugin manifest, hooks, commands, or MCP configuration.

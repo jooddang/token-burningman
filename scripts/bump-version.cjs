@@ -6,7 +6,7 @@ const root = path.resolve(__dirname, "..");
 const version = process.argv[2];
 
 if (!version || !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version)) {
-  console.error("Usage: pnpm run release:bump -- <semver>");
+  console.error("Usage: pnpm run release:bump <semver>");
   process.exit(1);
 }
 
