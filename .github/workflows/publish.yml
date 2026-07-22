@@ -146,7 +146,7 @@ jobs:
           }, null, 2)}\n`);
           NODE
 
-          npm publish --dry-run --ignore-scripts "release/$tarball"
+          npm publish --dry-run --ignore-scripts "./release/$tarball"
           {
             echo "integrity=$integrity"
             echo "tarball=$tarball"
@@ -266,7 +266,7 @@ jobs:
       - name: Publish with npm Trusted Publishing
         if: steps.registry.outputs.already-published != 'true'
         run: >-
-          npm publish "release/$EXPECTED_TARBALL"
+          npm publish "./release/$EXPECTED_TARBALL"
           --ignore-scripts
           --access public
           --provenance="$PROVENANCE_REQUIRED"
