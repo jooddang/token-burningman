@@ -146,7 +146,19 @@ jobs:
           }, null, 2)}\n`);
           NODE
 
-          npm publish --dry-run --ignore-scripts "./release/$tarball"
+          package_spec="$(node -p "require('./package.json').name + '@' + require('./package.json').version")"
+          dry_run_log="release/publish-dry-run.log"
+          if ! npm publish --dry-run --ignore-scripts "./release/$tarball" 2>&1 | tee "$dry_run_log"; then
+            if ! grep -Fq 'You cannot publish over the previously published versions' "$dry_run_log"; then
+              exit 1
+            fi
+            existing_integrity="$(npm view "$package_spec" dist.integrity)"
+            if [[ "$existing_integrity" != "$integrity" ]]; then
+              echo "Published version has different integrity: $existing_integrity" >&2
+              exit 1
+            fi
+            echo "Dry-run skipped because the registry already contains the identical package."
+          fi
           {
             echo "integrity=$integrity"
             echo "tarball=$tarball"
