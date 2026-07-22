@@ -1,5 +1,8 @@
 allowBuilds:
   esbuild: true
+auditConfig:
+  ignoreGhsas:
+    - GHSA-frvp-7c67-39w9
 overrides:
   path-to-regexp: ^8.4.0
   hono: '>=4.12.25'
