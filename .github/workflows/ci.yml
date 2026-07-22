@@ -58,4 +58,8 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Security audit
-        run: pnpm audit --prod
+        # GHSA-frvp-7c67-39w9 only affects Windows hosts that expose Hono's
+        # serve-static adapter. token-burningman is a local stdio MCP server
+        # and never imports or runs that HTTP/static-file path. The MCP SDK's
+        # supported 1.x range cannot yet take the patched node-server 2.x.
+        run: pnpm audit --prod --ignore GHSA-frvp-7c67-39w9
