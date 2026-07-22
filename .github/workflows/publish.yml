@@ -1,0 +1,360 @@
+name: Publish to npm
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to publish (for example, v0.2.4)
+        required: true
+        type: string
+
+concurrency:
+  group: npm-publish
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify and pack release
+    if: >-
+      github.repository == 'jooddang/token-burningman' &&
+      (github.event_name == 'push' || github.ref == 'refs/heads/master')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+    outputs:
+      commit: ${{ steps.release.outputs.commit }}
+      integrity: ${{ steps.pack.outputs.integrity }}
+      name: ${{ steps.release.outputs.name }}
+      tarball: ${{ steps.pack.outputs.tarball }}
+      version: ${{ steps.release.outputs.version }}
+
+    steps:
+      - name: Check out the exact release tag
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          ref: ${{ env.RELEASE_TAG }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+          registry-url: https://registry.npmjs.org
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 11.13.1
+
+      - name: Validate release identity
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ ! "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "Release tag must be stable SemVer in the form vX.Y.Z: $RELEASE_TAG" >&2
+            exit 1
+          fi
+
+          git fetch --force origin \
+            "refs/heads/master:refs/remotes/origin/master" \
+            "refs/tags/$RELEASE_TAG:refs/tags/$RELEASE_TAG"
+          release_commit="$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")"
+          checked_out_commit="$(git rev-parse HEAD)"
+
+          if [[ "$checked_out_commit" != "$release_commit" ]]; then
+            echo "Checkout does not match $RELEASE_TAG" >&2
+            exit 1
+          fi
+
+          if ! git merge-base --is-ancestor "$release_commit" origin/master; then
+            echo "$RELEASE_TAG is not reachable from origin/master" >&2
+            exit 1
+          fi
+
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+
+          const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+          const tag = process.env.RELEASE_TAG;
+          const expectedRepository = "git+https://github.com/jooddang/token-burningman.git";
+
+          if (pkg.name !== "token-burningman") {
+            throw new Error(`Unexpected package name: ${pkg.name}`);
+          }
+          if (`v${pkg.version}` !== tag) {
+            throw new Error(`Tag ${tag} does not match package version ${pkg.version}`);
+          }
+          if (pkg.repository?.url !== expectedRepository) {
+            throw new Error(`Unexpected repository URL: ${pkg.repository?.url}`);
+          }
+          NODE
+
+          package_name="$(node -p "require('./package.json').name")"
+          package_version="$(node -p "require('./package.json').version")"
+          {
+            echo "commit=$release_commit"
+            echo "name=$package_name"
+            echo "version=$package_version"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run the release gate
+        run: pnpm run release:check
+
+      - name: Build immutable package artifact
+        id: pack
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir release
+          npm pack --ignore-scripts --json > release/pack.json
+
+          tarball="$(node -p "JSON.parse(require('node:fs').readFileSync('release/pack.json', 'utf8'))[0].filename")"
+          integrity="$(node -p "JSON.parse(require('node:fs').readFileSync('release/pack.json', 'utf8'))[0].integrity")"
+          mv "$tarball" "release/$tarball"
+
+          TARBALL="$tarball" INTEGRITY="$integrity" RELEASE_COMMIT="${{ steps.release.outputs.commit }}" \
+            node --input-type=module <<'NODE'
+          import crypto from "node:crypto";
+          import fs from "node:fs";
+
+          const file = `release/${process.env.TARBALL}`;
+          const actual = `sha512-${crypto.createHash("sha512").update(fs.readFileSync(file)).digest("base64")}`;
+          if (actual !== process.env.INTEGRITY) {
+            throw new Error(`Tarball integrity mismatch: ${actual}`);
+          }
+
+          const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+          fs.writeFileSync("release/metadata.json", `${JSON.stringify({
+            commit: process.env.RELEASE_COMMIT,
+            integrity: actual,
+            name: pkg.name,
+            repository: pkg.repository.url,
+            tag: process.env.RELEASE_TAG,
+            tarball: process.env.TARBALL,
+            version: pkg.version,
+          }, null, 2)}\n`);
+          NODE
+
+          npm publish --dry-run --ignore-scripts "release/$tarball"
+          {
+            echo "integrity=$integrity"
+            echo "tarball=$tarball"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Upload verified package artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: npm-package-${{ steps.release.outputs.version }}
+          path: release/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 1
+
+  publish:
+    name: Publish verified artifact
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      EXPECTED_COMMIT: ${{ needs.verify.outputs.commit }}
+      EXPECTED_INTEGRITY: ${{ needs.verify.outputs.integrity }}
+      EXPECTED_NAME: ${{ needs.verify.outputs.name }}
+      EXPECTED_TARBALL: ${{ needs.verify.outputs.tarball }}
+      EXPECTED_VERSION: ${{ needs.verify.outputs.version }}
+      PROVENANCE_REQUIRED: ${{ github.event_name == 'push' && 'true' || 'false' }}
+
+    steps:
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+          registry-url: https://registry.npmjs.org
+
+      - name: Require an OIDC-capable npm CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { execFileSync } from "node:child_process";
+
+          const version = execFileSync("npm", ["--version"], { encoding: "utf8" }).trim();
+          const [major, minor, patch] = version.split(".").map(Number);
+          const supported = major > 11 || (major === 11 && (minor > 5 || (minor === 5 && patch >= 1)));
+          if (!supported) {
+            throw new Error(`npm >= 11.5.1 is required for trusted publishing; found ${version}`);
+          }
+          console.log(`Using npm ${version}`);
+          NODE
+
+      - name: Download verified package artifact
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: npm-package-${{ needs.verify.outputs.version }}
+          path: release
+
+      - name: Verify artifact handoff
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import crypto from "node:crypto";
+          import fs from "node:fs";
+
+          const metadata = JSON.parse(fs.readFileSync("release/metadata.json", "utf8"));
+          const expected = {
+            commit: process.env.EXPECTED_COMMIT,
+            integrity: process.env.EXPECTED_INTEGRITY,
+            name: process.env.EXPECTED_NAME,
+            tarball: process.env.EXPECTED_TARBALL,
+            version: process.env.EXPECTED_VERSION,
+          };
+
+          for (const [key, value] of Object.entries(expected)) {
+            if (metadata[key] !== value) {
+              throw new Error(`Artifact ${key} mismatch: ${metadata[key]} !== ${value}`);
+            }
+          }
+
+          const bytes = fs.readFileSync(`release/${metadata.tarball}`);
+          const actual = `sha512-${crypto.createHash("sha512").update(bytes).digest("base64")}`;
+          if (actual !== metadata.integrity) {
+            throw new Error(`Downloaded tarball integrity mismatch: ${actual}`);
+          }
+          NODE
+
+      - name: Check whether this exact package already exists
+        id: registry
+        shell: bash
+        run: |
+          set -euo pipefail
+          package_spec="$EXPECTED_NAME@$EXPECTED_VERSION"
+          error_file="$RUNNER_TEMP/npm-view-error.log"
+
+          if npm view "$package_spec" dist.integrity --json > "$RUNNER_TEMP/existing-integrity.json" 2> "$error_file"; then
+            EXISTING_FILE="$RUNNER_TEMP/existing-integrity.json" node --input-type=module <<'NODE'
+            import fs from "node:fs";
+
+            const existing = JSON.parse(fs.readFileSync(process.env.EXISTING_FILE, "utf8"));
+            if (existing !== process.env.EXPECTED_INTEGRITY) {
+              throw new Error(`Published version has different integrity: ${existing}`);
+            }
+            console.log("The registry already contains the identical immutable package.");
+            NODE
+            echo "already-published=true" >> "$GITHUB_OUTPUT"
+          else
+            if ! grep -Eq 'E404|404 Not Found' "$error_file"; then
+              cat "$error_file" >&2
+              exit 1
+            fi
+            echo "already-published=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish with npm Trusted Publishing
+        if: steps.registry.outputs.already-published != 'true'
+        run: >-
+          npm publish "release/$EXPECTED_TARBALL"
+          --ignore-scripts
+          --access public
+          --provenance="$PROVENANCE_REQUIRED"
+
+      - name: Verify registry integrity and provenance
+        env:
+          ALREADY_PUBLISHED: ${{ steps.registry.outputs.already-published }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          package_spec="$EXPECTED_NAME@$EXPECTED_VERSION"
+
+          for attempt in $(seq 1 20); do
+            published_integrity="$(npm view "$package_spec" dist.integrity 2>/dev/null || true)"
+            provenance_url="$(npm view "$package_spec" dist.attestations.url 2>/dev/null || true)"
+            latest="$(npm view "$EXPECTED_NAME" dist-tags.latest 2>/dev/null || true)"
+
+            provenance_ok=false
+            if [[ "$PROVENANCE_REQUIRED" == "true" && -n "$provenance_url" ]]; then
+              provenance_ok=true
+            elif [[ "$PROVENANCE_REQUIRED" == "false" && -z "$provenance_url" ]]; then
+              provenance_ok=true
+            fi
+
+            latest_ok=false
+            if [[ "$ALREADY_PUBLISHED" == "true" || "$latest" == "$EXPECTED_VERSION" ]]; then
+              latest_ok=true
+            fi
+
+            if [[ "$published_integrity" == "$EXPECTED_INTEGRITY" && "$provenance_ok" == "true" && "$latest_ok" == "true" ]]; then
+              echo "Published $package_spec"
+              echo "Integrity: $published_integrity"
+              if [[ "$PROVENANCE_REQUIRED" == "true" ]]; then
+                echo "Provenance: $provenance_url"
+              else
+                echo "Provenance: intentionally disabled for existing-tag recovery"
+              fi
+              exit 0
+            fi
+            echo "Waiting for registry propagation (attempt $attempt/20)..."
+            sleep 6
+          done
+
+          echo "Registry verification failed for $package_spec" >&2
+          npm view "$package_spec" dist dist-tags --json || true
+          exit 1
+
+  smoke:
+    name: Smoke-test published MCP runtime
+    needs: [verify, publish]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      PACKAGE_NAME: ${{ needs.verify.outputs.name }}
+      PACKAGE_VERSION: ${{ needs.verify.outputs.version }}
+
+    steps:
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+          registry-url: https://registry.npmjs.org
+
+      - name: Initialize the published MCP server
+        shell: bash
+        run: |
+          set -euo pipefail
+          smoke_dir="$(mktemp -d)"
+          trap 'rm -rf "$smoke_dir"' EXIT
+
+          cd "$smoke_dir"
+          printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"release-smoke","version":"1"}}}' \
+            | npx -y --package="$PACKAGE_NAME@$PACKAGE_VERSION" burningman-mcp > response.jsonl
+
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+
+          const expected = process.env.PACKAGE_VERSION;
+          const responses = fs.readFileSync("response.jsonl", "utf8")
+            .split("\n")
+            .filter(Boolean)
+            .map((line) => JSON.parse(line));
+          const initialized = responses.find((response) => response.id === 1);
+          const actual = initialized?.result?.serverInfo?.version;
+          if (actual !== expected) {
+            throw new Error(`Published MCP version mismatch: ${actual} !== ${expected}`);
+          }
+          console.log(`Published MCP server initialized as v${actual}`);
+          NODE

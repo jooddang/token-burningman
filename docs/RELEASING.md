@@ -54,24 +54,63 @@ git commit -m "chore: release 0.2.4"
 git push origin master
 RUN_ID=$(gh run list --repo jooddang/token-burningman --commit "$(git rev-parse HEAD)" --limit 1 --json databaseId --jq '.[0].databaseId')
 gh run watch "$RUN_ID" --repo jooddang/token-burningman --exit-status
-git tag v0.2.4
-git push origin v0.2.4
 ```
+
+Do not tag a release until this commit is on `master` and CI is green. Future release tags must contain `.github/workflows/publish.yml`; this is what allows their tag-push events to publish automatically.
+
+## 4. Configure npm Trusted Publishing once
+
+The package owner must create one trusted relationship after `publish.yml` exists on `master`. npm CLI 11.15 or newer is required for this configuration command, and npm requires real account 2FA for this one-time bootstrap. A bypass-2FA granular access token cannot create the relationship.
+
+```bash
+npm trust github token-burningman \
+  --file publish.yml \
+  --repo jooddang/token-burningman \
+  --allow-publish \
+  --yes
+npm trust list token-burningman --json
+```
+
+Do not add an npm write token or `NODE_AUTH_TOKEN` secret to GitHub. The publish job exchanges GitHub's OIDC identity for a short-lived npm credential and npm generates provenance automatically. Keep token publishing available until the first trusted release succeeds; then remove old automation tokens and set package publishing access to require 2FA while disallowing tokens.
+
+Only one npm trusted publisher can be active for a package. To rotate or disable it, inspect its ID and revoke that exact relationship:
+
+```bash
+npm trust list token-burningman --json
+npm trust revoke token-burningman --id=<trust-id>
+```
+
+## 5. Publish the release
+
+For a normal release, create and push the stable SemVer tag only after the trusted relationship exists:
+
+```bash
+VERSION=$(node -p "require('./package.json').version")
+git tag "v$VERSION"
+git push origin "v$VERSION"
+RUN_ID=$(gh run list --workflow publish.yml --limit 1 --json databaseId --jq '.[0].databaseId')
+gh run watch "$RUN_ID" --exit-status
+```
+
+Pushing the tag starts `.github/workflows/publish.yml`. The workflow checks out that exact tag, proves that it is reachable from `origin/master`, repeats the full release gate, and creates an immutable npm tarball. A separate job with no dependency installation receives `id-token: write` and publishes only that verified tarball through npm Trusted Publishing. A third job launches the published MCP binary from a clean temporary directory.
 
 A GitHub Release page is optional; the marketplaces consume the repository and tag, not a GitHub Release asset.
 
-## 4. Publish the Codex runtime to npm
+### Recover an already-created tag
 
-Confirm the npm identity and publish only after CI is green:
+GitHub does not replay past tag-push events when a workflow is added later. If a valid release tag already exists, run the workflow from `master` and pass the immutable tag explicitly:
 
 ```bash
-npm whoami
-npm publish
+gh workflow run publish.yml --ref master -f tag=v0.2.4
+RUN_ID=$(gh run list --workflow publish.yml --limit 1 --json databaseId --jq '.[0].databaseId')
+gh run watch "$RUN_ID" --exit-status
 ```
 
-`npm publish` automatically runs `prepublishOnly`, which repeats `release:check`. If `npm whoami` fails, authenticate with `npm login` and rerun it. Do not use `--force` to reuse an existing version; bump to a new version instead.
+The manual path applies the same stable-SemVer, tag/commit, `origin/master`, package version, repository URL, tarball integrity, and live MCP checks as the automatic tag path. It deliberately publishes with `--provenance=false`: GitHub provenance describes the workflow invocation ref and SHA, which are `master` for a manual dispatch, while the recovered tarball comes from the older tag. Disabling provenance avoids attaching a valid but misleading statement. OIDC authentication is still used. Normal tag-push releases generate provenance because their invocation SHA and package source are the same tag commit.
 
-## 5. Verify the live release
+Never move or force-push a release tag. npm versions and release tags are immutable; fix a failed or incorrect release with a new version.
+
+## 6. Verify the live release
 
 Registry propagation can take a short time. Verify the dist-tag and execute the exact published package from outside the repository. Running `npx --package=token-burningman` inside the package's own checkout can make npm reuse the local root package without linking its bin commands.
 
@@ -84,6 +123,14 @@ rmdir "$SMOKE_DIR"
 ```
 
 The response's `result.serverInfo.version` must be `0.2.4`.
+
+For normal tag-push releases, verify that npm recorded GitHub provenance as well as the expected tarball integrity:
+
+```bash
+npm view token-burningman@0.2.4 dist.integrity dist.attestations --json
+```
+
+For an existing-tag recovery, `dist.integrity` must match but `dist.attestations` must be absent, as documented above.
 
 Then test the client update paths:
 
