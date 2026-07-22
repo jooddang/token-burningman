@@ -245,15 +245,13 @@ jobs:
           error_file="$RUNNER_TEMP/npm-view-error.log"
 
           if npm view "$package_spec" dist.integrity --json > "$RUNNER_TEMP/existing-integrity.json" 2> "$error_file"; then
-            EXISTING_FILE="$RUNNER_TEMP/existing-integrity.json" node --input-type=module <<'NODE'
-            import fs from "node:fs";
-
-            const existing = JSON.parse(fs.readFileSync(process.env.EXISTING_FILE, "utf8"));
-            if (existing !== process.env.EXPECTED_INTEGRITY) {
-              throw new Error(`Published version has different integrity: ${existing}`);
-            }
-            console.log("The registry already contains the identical immutable package.");
-            NODE
+            existing_integrity="$(EXISTING_FILE="$RUNNER_TEMP/existing-integrity.json" node -p \
+              "JSON.parse(require('node:fs').readFileSync(process.env.EXISTING_FILE, 'utf8'))")"
+            if [[ "$existing_integrity" != "$EXPECTED_INTEGRITY" ]]; then
+              echo "Published version has different integrity: $existing_integrity" >&2
+              exit 1
+            fi
+            echo "The registry already contains the identical immutable package."
             echo "already-published=true" >> "$GITHUB_OUTPUT"
           else
             if ! grep -Eq 'E404|404 Not Found' "$error_file"; then
