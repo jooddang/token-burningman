@@ -54,6 +54,35 @@ assert.ok(
   "Claude plugin hooks/hooks.json is missing",
 );
 
+const claudeLoginCommand = fs.readFileSync(path.join(root, "commands", "login.md"), "utf8");
+assert.match(
+  claudeLoginCommand,
+  /Call `login_sfvibe`/,
+  "Claude /token-burningman:login command must call login_sfvibe",
+);
+assert.match(
+  claudeLoginCommand,
+  /Do not call `launch_tui`/,
+  "Claude /token-burningman:login command must not launch the TUI",
+);
+
+const codexLoginSkill = fs.readFileSync(path.join(root, "skills", "login", "SKILL.md"), "utf8");
+assert.match(
+  codexLoginSkill,
+  /^name: login$/m,
+  "Codex $token-burningman:login skill must be named login",
+);
+assert.match(
+  codexLoginSkill,
+  /`login_sfvibe`/,
+  "Codex $token-burningman:login skill must call login_sfvibe",
+);
+assert.match(
+  codexLoginSkill,
+  /Do not call `launch_tui`/,
+  "Codex $token-burningman:login skill must not launch the TUI",
+);
+
 for (const executable of ["burningman", "burningman-codex-import", "burningman-mcp"]) {
   const target = packageJson.bin?.[executable];
   assert.ok(target, `package.json is missing the ${executable} bin entry`);
@@ -142,6 +171,10 @@ const toolsResponse = JSON.parse(mcp.stdout.trim().split("\n")[1]);
 assert.ok(
   toolsResponse.result?.tools?.some((tool) => tool.name === "get_overview"),
   "Codex MCP tools/list response is missing get_overview",
+);
+assert.ok(
+  toolsResponse.result?.tools?.some((tool) => tool.name === "login_sfvibe"),
+  "Claude/Codex login workflows require the login_sfvibe MCP tool",
 );
 
 console.log(`Release artifacts are consistent at ${version}.`);

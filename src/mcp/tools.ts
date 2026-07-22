@@ -110,7 +110,9 @@ export function registerTools(server: McpServer): void {
     async () => {
       const config = readJson(getConfigPath(), DEFAULT_CONFIG);
       if (!config.publicReporting?.cliToken) {
-        return asTextResult("Not authenticated. Sign in via the Community tab in the TUI first.");
+        return asTextResult(
+          "Not authenticated. Run /token-burningman:login in Claude Code or $token-burningman:login in Codex.",
+        );
       }
       const ok = await submitPublicReport(config);
       return ok

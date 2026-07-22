@@ -26690,7 +26690,9 @@ function registerTools(server) {
     async () => {
       const config2 = readJson(getConfigPath(), DEFAULT_CONFIG);
       if (!config2.publicReporting?.cliToken) {
-        return asTextResult("Not authenticated. Sign in via the Community tab in the TUI first.");
+        return asTextResult(
+          "Not authenticated. Run /token-burningman:login in Claude Code or $token-burningman:login in Codex."
+        );
       }
       const ok = await submitPublicReport(config2);
       return ok ? asTextResult("Report synced successfully.", { status: "ok" }) : asTextResult("Sync failed. Check server connectivity or auth token.", { status: "error" });
@@ -26731,7 +26733,7 @@ function registerTools(server) {
 }
 
 // src/version.ts
-var APP_VERSION = "0.2.3";
+var APP_VERSION = "0.2.4";
 
 // src/mcp/server.ts
 async function main() {

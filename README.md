@@ -225,7 +225,17 @@ Export session or hourly data as JSON or CSV via the `/export` slash command in 
   <img src="images/ss5.png" width="720" alt="Community dashboard" />
 </p>
 
-Sign in via the **Community** tab in the TUI (press `5`, then `s`) or ask Codex to sign in to sfvibe.fun, which calls the `login_sfvibe` MCP tool. After authentication, hourly aggregates are submitted automatically when maintenance or Codex import runs.
+Sign in without opening the TUI:
+
+```text
+# Claude Code
+/token-burningman:login
+
+# Codex
+$token-burningman:login
+```
+
+Claude Code exposes the workflow as a plugin slash command. Codex exposes distributable plugin workflows as skills, so its equivalent uses the `$plugin:skill` form. Both commands call the `login_sfvibe` MCP tool directly, open the browser authentication flow, and wait for confirmation. The **Community** tab in the TUI (press `5`, then `s`) remains available as an alternative. After authentication, hourly aggregates are submitted automatically when maintenance or Codex import runs.
 
 <p align="center">
   <img src="images/burningman social board.png" width="720" alt="SFvibe.fun community social board" />
